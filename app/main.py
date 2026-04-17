@@ -31,8 +31,7 @@ def predict_news(request: NewsRequest):
 
         with torch.no_grad():
             logits = model(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"]
+                input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]
             )
 
             probs = torch.softmax(logits, dim=1)
@@ -42,9 +41,7 @@ def predict_news(request: NewsRequest):
         label = "FAKE" if prediction == 1 else "REAL"
 
         return PredictionResponse(
-            label=label,
-            prediction=prediction,
-            confidence=round(confidence, 4)
+            label=label, prediction=prediction, confidence=round(confidence, 4)
         )
 
     except Exception as e:
