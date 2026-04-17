@@ -1,19 +1,13 @@
 import torch
 from fastapi import FastAPI, HTTPException
 
-from app.predictor import model, tokenizer
+from app.predictor import device, model, tokenizer
 from app.schemas import NewsRequest, PredictionResponse
 
 app = FastAPI(
     title="BuloCheck API",
-    version="2.0.0",
-    description="API para clasificación binaria de noticias con Gemma + partial fine-tuning",
+    version="2.1.0",
 )
-
-
-@app.get("/")
-def home():
-    return {"message": "BuloCheck API funcionando"}
 
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -29,19 +23,21 @@ def predict_news(request: NewsRequest):
             max_length=512,
         )
 
-        with torch.no_grad():
-            logits = model(
-                input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"]
-            )
+        # mover a device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
 
-            probs = torch.softmax(logits, dim=1)
-            prediction = torch.argmax(probs, dim=1).item()
-            confidence = probs[0][prediction].item()
+        model.eval()
+        with torch.inference_mode():
+            logits = model(**inputs)
 
-        label = "FAKE" if prediction == 1 else "REAL"
+        probs = torch.softmax(logits, dim=1)
+        prediction = torch.argmax(probs, dim=1).item()
+        confidence = probs[0][prediction].item()
 
         return PredictionResponse(
-            label=label, prediction=prediction, confidence=round(confidence, 4)
+            label="FAKE" if prediction == 1 else "REAL",
+            prediction=prediction,
+            confidence=round(confidence, 4),
         )
 
     except Exception as e:

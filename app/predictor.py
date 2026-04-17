@@ -46,4 +46,7 @@ model.base_model.layers[-N:].load_state_dict(partial["last_layers"])
 # Cargar classifier
 model.classifier.load_state_dict(partial["classifier"])
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
 model.eval()
