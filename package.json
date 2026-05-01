@@ -1,0 +1,17 @@
+{
+  "name": "bulocheck",
+  "version": "1.0.0",
+  "description": "BuloCheck is a Chrome extension designed to detect and classify misinformation using Artificial Intelligence. It leverages a Large Language Model (LLM) specifically fine-tuned to distinguish between real and fake news with high accuracy.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "format": "prettier --write \"extension/**/*.{js,html,json}\"",
+    "check-format": "prettier --check \"extension/**/*.{js,html,json}\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "prettier": "^3.8.3"
+  }
+}
