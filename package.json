@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "format": "prettier --write \"extension/**/*.{js,html,json}\"",
-    "check-format": "prettier --check \"extension/**/*.{js,html,json}\""
+    "check-format": "prettier --check \"extension/**/*.{js,html,json}\"",
+    "format:py": "isort app/ && black app/"
   },
   "keywords": [],
   "author": "",

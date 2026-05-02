@@ -3,6 +3,13 @@ from fastapi import FastAPI, HTTPException
 
 from app.predictor import device, model, tokenizer
 from app.schemas import NewsRequest, PredictionResponse
+from app.validators import (
+    validate_language,
+    validate_meaningful_text,
+    validate_repetitive_text,
+    validate_text_length,
+    validate_text_not_empty,
+)
 
 app = FastAPI(
     title="BuloCheck API",
@@ -13,7 +20,17 @@ app = FastAPI(
 @app.post("/predict", response_model=PredictionResponse)
 def predict_news(request: NewsRequest):
     try:
-        full_text = f"{request.title}\n{request.text}"
+        text = request.text
+
+        # VALIDATIONS
+        validate_text_not_empty(text)
+        validate_text_length(text)
+        validate_meaningful_text(text)
+        validate_repetitive_text(text)
+        validate_language(text)
+
+        # INFERENCE
+        full_text = f"{request.title}\n{text}"
 
         inputs = tokenizer(
             full_text,
@@ -23,10 +40,10 @@ def predict_news(request: NewsRequest):
             max_length=512,
         )
 
-        # mover a device
         inputs = {k: v.to(device) for k, v in inputs.items()}
 
         model.eval()
+
         with torch.inference_mode():
             logits = model(**inputs)
 
@@ -40,5 +57,8 @@ def predict_news(request: NewsRequest):
             confidence=round(confidence, 4),
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+
+    except Exception:
+        raise HTTPException(status_code=500, detail="Model inference failed")
