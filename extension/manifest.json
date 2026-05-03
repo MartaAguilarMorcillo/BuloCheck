@@ -4,8 +4,13 @@
   "version": "1.0",
   "description": "Detect fake news using AI classification",
 
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
+
   "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "background.js"
+  },
 
   "action": {
     "default_popup": "popup.html",
