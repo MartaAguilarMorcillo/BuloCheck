@@ -7,16 +7,33 @@
     <style>
       body {
         font-family: Arial, sans-serif;
-        width: 220px;
-        padding: 12px;
+        width: 300px;
+        padding: 15px;
         background: #0f172a;
         color: white;
-        text-align: center;
       }
 
-      h3 {
-        margin-bottom: 10px;
-        font-size: 18px;
+      h2 {
+        text-align: center;
+        margin-bottom: 15px;
+      }
+
+      .section {
+        margin-bottom: 15px;
+      }
+
+      .label {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .box {
+        background: #1e293b;
+        padding: 10px;
+        border-radius: 8px;
+        max-height: 100px;
+        overflow-y: auto;
+        font-size: 13px;
       }
 
       button {
@@ -35,19 +52,41 @@
       }
 
       .status {
-        margin-top: 10px;
+        margin-top: 12px;
+        text-align: center;
         font-size: 12px;
         opacity: 0.8;
+      }
+
+      .secondary-btn {
+        margin-top: 8px;
+        background: #334155;
+      }
+
+      .secondary-btn:hover {
+        background: #475569;
       }
     </style>
   </head>
 
   <body>
-    <h3>BuloCheck</h3>
+    <h2>BuloCheck</h2>
 
-    <button id="analyze">Analyze article</button>
+    <div class="section">
+      <div class="label">Selected Title</div>
+      <div class="box" id="titleBox">No title selected</div>
+    </div>
 
-    <div class="status" id="status">Ready</div>
+    <div class="section">
+      <div class="label">Selected Article Body</div>
+      <div class="box" id="bodyBox">No body selected</div>
+    </div>
+
+    <button id="analyze">Analyze Article</button>
+
+    <button id="clear" class="secondary-btn">Clear Selection</button>
+
+    <div class="status" id="status">Waiting for selection...</div>
 
     <script src="popup.js"></script>
   </body>
