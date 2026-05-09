@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+# Aquí excluimos la carpeta específica
+extend-exclude = 'app/gemma_fake_news_adapter/'
+
+[tool.isort]
+profile = "black"
+skip = ["app/gemma_fake_news_adapter/"]
+line_length = 88
