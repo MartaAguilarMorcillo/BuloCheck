@@ -5,66 +5,130 @@
     <title>BuloCheck</title>
 
     <style>
+      :root {
+        --bg-dark: #0f172a;
+        --card-bg: #1e293b;
+        --primary: #3b82f6;
+        --primary-hover: #2563eb;
+        --secondary: #334155;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --danger: #ef4444;
+        --success: #22c55e;
+      }
+
       body {
-        font-family: Arial, sans-serif;
-        width: 300px;
-        padding: 15px;
-        background: #0f172a;
-        color: white;
+        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        width: 320px;
+        padding: 20px;
+        background: var(--bg-dark);
+        color: var(--text-main);
+        margin: 0;
       }
 
       h2 {
         text-align: center;
-        margin-bottom: 15px;
+        margin: 0 0 20px 0;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: var(--primary);
       }
 
       .section {
-        margin-bottom: 15px;
+        margin-bottom: 16px;
       }
 
       .label {
-        font-weight: bold;
-        margin-bottom: 5px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        font-weight: 700;
       }
 
       .box {
-        background: #1e293b;
-        padding: 10px;
-        border-radius: 8px;
-        max-height: 100px;
+        background: var(--card-bg);
+        padding: 12px;
+        border-radius: 10px;
+        max-height: 80px;
         overflow-y: auto;
         font-size: 13px;
+        line-height: 1.4;
+        border: 1px solid #334155;
+        transition: all 0.3s ease;
+      }
+
+      #resultBox {
+        max-height: none;
+        font-weight: 600;
+        text-align: center;
+        border: 2px solid transparent;
+      }
+
+      .confidence-container {
+        height: 6px;
+        background: #00000033;
+        border-radius: 10px;
+        margin-top: 8px;
+        display: none;
+        overflow: hidden;
+      }
+
+      #confidenceBar {
+        height: 100%;
+        width: 0%;
+        border-radius: 10px;
+        transition: width 0.5s ease-in-out;
       }
 
       button {
         width: 100%;
-        padding: 10px;
+        padding: 12px;
         border: none;
-        border-radius: 8px;
-        background: #3b82f6;
+        border-radius: 10px;
+        background: var(--primary);
         color: white;
-        font-weight: bold;
+        font-weight: 700;
         cursor: pointer;
+        transition:
+          transform 0.1s,
+          background 0.2s;
+        margin-top: 10px;
+      }
+
+      button:active {
+        transform: scale(0.98);
       }
 
       button:hover {
-        background: #2563eb;
-      }
-
-      .status {
-        margin-top: 12px;
-        text-align: center;
-        font-size: 12px;
-        opacity: 0.8;
+        background: var(--primary-hover);
       }
 
       .secondary-btn {
-        margin-top: 8px;
-        background: #334155;
+        background: var(--secondary);
+        font-size: 12px;
+        padding: 8px;
       }
 
-      .secondary-btn:hover {
-        background: #475569;
+      .status {
+        margin-top: 15px;
+        text-align: center;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 700;
+        color: var(--text-muted);
+      }
+
+      .is-fake {
+        border-color: var(--danger) !important;
+        color: var(--danger);
+      }
+
+      .is-real {
+        border-color: var(--success) !important;
+        color: var(--success);
       }
     </style>
   </head>
@@ -74,26 +138,41 @@
 
     <div class="section">
       <div class="label">Selected Title</div>
-      <div class="box" id="titleBox">No title selected</div>
+      <div class="box" id="titleBox">
+        No title selected
+      </div>
     </div>
 
     <div class="section">
       <div class="label">Selected Article Body</div>
-      <div class="box" id="bodyBox">No body selected</div>
+      <div class="box" id="bodyBox">
+        No body selected
+      </div>
     </div>
 
     <div class="section">
       <div class="label">Prediction</div>
+
       <div class="box" id="resultBox">
         No prediction yet
       </div>
+
+      <div class="confidence-container" id="confWrapper">
+        <div id="confidenceBar"></div>
+      </div>
     </div>
 
-    <button id="analyze">Analyze Article</button>
+    <button id="analyze">
+      Analyze Article
+    </button>
 
-    <button id="clear" class="secondary-btn">Clear Selection</button>
+    <button id="clear" class="secondary-btn">
+      Clear Selection
+    </button>
 
-    <div class="status" id="status">Waiting for selection...</div>
+    <div class="status" id="status">
+      Ready
+    </div>
 
     <script src="popup.js"></script>
   </body>

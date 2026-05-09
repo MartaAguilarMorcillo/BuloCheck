@@ -4,6 +4,8 @@ const status = document.getElementById("status");
 const button = document.getElementById("analyze");
 const resultBox = document.getElementById("resultBox");
 const clearButton = document.getElementById("clear");
+const confidenceBar = document.getElementById("confidenceBar");
+const confWrapper = document.getElementById("confWrapper");
 
 async function loadSelections() {
   const data = await chrome.storage.local.get([
@@ -14,6 +16,12 @@ async function loadSelections() {
   titleBox.textContent = data.selectedTitle || "No title selected";
 
   bodyBox.textContent = data.selectedBody || "No body selected";
+
+  confWrapper.style.display = "none";
+
+  confidenceBar.style.width = "0%";
+
+  resultBox.classList.remove("is-fake", "is-real");
 }
 
 button.addEventListener("click", async () => {
@@ -78,6 +86,8 @@ button.addEventListener("click", async () => {
   try {
 
     status.textContent = "Analyzing article...";
+    resultBox.textContent = "Analyzing...";
+    confWrapper.style.display = "none";
 
     const response = await fetch(
       "http://127.0.0.1:8000/predict",
@@ -101,18 +111,50 @@ button.addEventListener("click", async () => {
     if (!response.ok) {
 
       status.textContent =
-        result.detail || "Backend error ❌";
+        typeof result.detail === "string"
+          ? result.detail
+          : result.detail?.[0]?.msg || "Backend error ❌";
 
       resultBox.textContent =
         "No prediction available";
+      
+      confWrapper.style.display = "none";
+      confidenceBar.style.width = "0%";
+      resultBox.classList.remove("is-fake", "is-real");
 
       return;
     }
 
     // MOSTRAR RESULTADO
+    const confidence = result.confidence * 100;
+    const confidenceFixed = confidence.toFixed(2);
+
     resultBox.textContent =
-      `Prediction: ${result.label}
-  Confidence: ${(result.confidence * 100).toFixed(2)}%`;
+      `${result.label} (${confidenceFixed}%)`;
+
+    confWrapper.style.display = "block";
+
+    confidenceBar.style.width = `${confidence}%`;
+
+    resultBox.classList.remove(
+      "is-fake",
+      "is-real"
+    );
+
+    if (result.label === "FAKE") {
+
+      resultBox.classList.add("is-fake");
+
+      confidenceBar.style.background =
+        "#ef4444";
+
+    } else {
+
+      resultBox.classList.add("is-real");
+
+      confidenceBar.style.background =
+        "#22c55e";
+    }
 
     status.textContent =
       "Analysis completed ✔";
@@ -136,6 +178,15 @@ clearButton.addEventListener("click", async () => {
   titleBox.textContent = "No title selected";
   bodyBox.textContent = "No body selected";
   resultBox.textContent = "No prediction yet";
+
+  resultBox.classList.remove(
+    "is-fake",
+    "is-real"
+  );
+
+  confWrapper.style.display = "none";
+
+  confidenceBar.style.width = "0%";
 
   status.textContent = "Selection cleared ✔";
 });
