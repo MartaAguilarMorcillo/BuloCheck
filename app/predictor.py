@@ -27,7 +27,7 @@ tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
 # ==========================
 # Modelo base desde HF
 # ==========================
-base_model = AutoModel.from_pretrained(config["model_name"], torch_dtype=torch.float32)
+base_model = AutoModel.from_pretrained(config["model_name"], dtype=torch.float32)
 
 # ==========================
 # Reconstrucción modelo
