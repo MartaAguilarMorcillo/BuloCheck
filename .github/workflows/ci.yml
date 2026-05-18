@@ -1,4 +1,4 @@
-name: FastAPI CI
+name: Django CI
 
 on:
   push:
@@ -16,20 +16,61 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: fakenews_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SECRET_KEY: ci-secret-key-for-testing-only
+      DEBUG: "True"
+      DB_NAME: fakenews_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: localhost
+      DB_PORT: 5432
+
     steps:
-      - name: Checkout código
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configurar Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Instalar dependencias
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Validar sintaxis
+      - name: Validate syntax
         run: |
-          python -m py_compile app/main.py
+          python -m py_compile fakenews_backend/settings.py
+          python -m py_compile fakenews_backend/urls.py
+          python -m py_compile api/models.py
+          python -m py_compile api/views.py
+          python -m py_compile api/serializers.py
+          python -m py_compile api/ml.py
+
+      - name: Run migrations
+        run: |
+          python manage.py migrate --no-input
+
+      - name: Run system checks
+        run: |
+          python manage.py check
+
+      - name: Run tests
+        run: |
+          python manage.py test
