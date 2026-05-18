@@ -1,4 +1,5 @@
 from django.contrib import admin
+
 from .models import AnonymousUser, NewsCheck
 
 
@@ -17,4 +18,5 @@ class NewsCheckAdmin(admin.ModelAdmin):
 
     def title_short(self, obj):
         return obj.title[:60]
+
     title_short.short_description = "Title"

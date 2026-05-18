@@ -1,9 +1,11 @@
 from rest_framework import serializers
+
 from .models import NewsCheck
 
 
 class PredictRequestSerializer(serializers.Serializer):
     """Valida los datos de entrada del endpoint /api/predict/"""
+
     title = serializers.CharField(max_length=1000)
     text = serializers.CharField()
     source = serializers.CharField(max_length=500, required=False, allow_blank=True)
@@ -12,6 +14,7 @@ class PredictRequestSerializer(serializers.Serializer):
 
 class NewsCheckSerializer(serializers.ModelSerializer):
     """Serializa un registro de NewsCheck para devolverlo al cliente."""
+
     class Meta:
         model = NewsCheck
         fields = [

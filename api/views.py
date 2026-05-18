@@ -1,10 +1,10 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import AnonymousUser, NewsCheck
-from .serializers import PredictRequestSerializer, NewsCheckSerializer
 from .ml import predict_news
+from .models import AnonymousUser, NewsCheck
+from .serializers import NewsCheckSerializer, PredictRequestSerializer
 
 
 class PredictView(APIView):
@@ -53,14 +53,16 @@ class PredictView(APIView):
             error_msg = str(e)
             if "timed out" in error_msg.lower():
                 return Response(
-                    {"error": "The model is waking up, please try again in 30 seconds."},
+                    {
+                        "error": "The model is waking up, please try again in 30 seconds."
+                    },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
             return Response(
                 {"error": error_msg},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-        
+
         # 4. Save to database
         check = NewsCheck.objects.create(
             user=user,
@@ -207,14 +209,16 @@ class SourceStatsView(APIView):
                 else 0.0
             )
 
-            result.append({
-                "source": src_data["source"],
-                "total": total,
-                "real": real_count,
-                "fake": src_data["fake"],
-                "real_confidence_avg": real_confidence_avg,
-                "reliability_pct": round(real_count / total * 100, 1),
-            })
+            result.append(
+                {
+                    "source": src_data["source"],
+                    "total": total,
+                    "real": real_count,
+                    "fake": src_data["fake"],
+                    "real_confidence_avg": real_confidence_avg,
+                    "reliability_pct": round(real_count / total * 100, 1),
+                }
+            )
 
         # Sort: 1st by number of REAL articles (desc), 2nd by avg confidence (desc)
         result.sort(

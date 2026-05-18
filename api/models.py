@@ -1,4 +1,5 @@
 import uuid
+
 from django.db import models
 
 
@@ -8,6 +9,7 @@ class AnonymousUser(models.Model):
     No requiere registro ni contraseña.
     El UUID se genera en la extensión y se guarda en localStorage.
     """
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -22,6 +24,7 @@ class NewsCheck(models.Model):
     """
     Cada vez que un usuario analiza una noticia se guarda un registro aquí.
     """
+
     LABEL_CHOICES = [
         ("REAL", "Real"),
         ("FAKE", "Fake"),
