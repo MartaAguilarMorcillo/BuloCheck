@@ -1,4 +1,3 @@
-from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -12,28 +11,28 @@ class PredictView(APIView):
     """
     POST /api/predict/
 
-    Recibe title, text, source (opcional) y device_id.
-    Llama al modelo en HuggingFace, guarda el resultado en BD y lo devuelve.
+    Receives title, text, source (optional) and device_id.
+    Calls the model on HuggingFace Space, saves the result in DB and returns it.
 
-    Body JSON:
+    Request body:
         {
             "title": "...",
             "text": "...",
-            "source": "elpais.com",   ← opcional
-            "device_id": "uuid-del-navegador"
+            "source": "bbc.com",     <- optional
+            "device_id": "uuid"
         }
 
-    Respuesta:
+    Response:
         {
-            "label": "FAKE",
+            "label": "FAKE" | "REAL",
             "confidence": 0.94,
             "probas": {"REAL": 0.06, "FAKE": 0.94},
-            "check_id": 12
+            "check_id": 1
         }
     """
 
     def post(self, request):
-        # 1. Validar entrada
+        # 1. Validate input
         serializer = PredictRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -42,31 +41,37 @@ class PredictView(APIView):
         device_id = data["device_id"]
         title = data["title"]
         text = data["text"]
-        source = data.get("source", None)
+        source = data.get("source") or None
 
-        # 2. Obtener o crear usuario anónimo por device_id
+        # 2. Get or create anonymous user by device_id
         user, _ = AnonymousUser.objects.get_or_create(id=device_id)
 
-        # 3. Llamar al modelo
+        # 3. Call the model
         try:
             result = predict_news(title=title, text=text)
-        except RuntimeError as e:
+        except Exception as e:
+            error_msg = str(e)
+            if "timed out" in error_msg.lower():
+                return Response(
+                    {"error": "The model is waking up, please try again in 30 seconds."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
             return Response(
-                {"error": str(e)},
+                {"error": error_msg},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
-
-        # 4. Guardar en base de datos
+        
+        # 4. Save to database
         check = NewsCheck.objects.create(
             user=user,
             title=title,
             text=text,
-            source=source or None,
+            source=source,
             label=result["label"],
             confidence=result["confidence"],
         )
 
-        # 5. Devolver resultado
+        # 5. Return result
         return Response(
             {
                 "label": result["label"],
@@ -82,18 +87,19 @@ class HistoryView(APIView):
     """
     GET /api/history/
 
-    Devuelve el historial de noticias analizadas por el usuario.
-    El device_id se manda como header: X-Device-ID
+    Returns the list of news articles analyzed by the user.
+    Requires header: X-Device-ID
 
-    Respuesta:
+    Response:
         [
             {
                 "id": 1,
                 "title": "...",
-                "label": "FAKE",
+                "text": "...",
+                "source": "bbc.com",
+                "label": "REAL",
                 "confidence": 0.94,
-                "source": "elpais.com",
-                "created_at": "2024-05-14T10:23:00Z"
+                "created_at": "2026-05-16T20:49:36Z"
             },
             ...
         ]
@@ -103,14 +109,13 @@ class HistoryView(APIView):
         device_id = request.headers.get("X-Device-ID")
         if not device_id:
             return Response(
-                {"error": "Falta el header X-Device-ID"},
+                {"error": "Missing X-Device-ID header"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             user = AnonymousUser.objects.get(id=device_id)
-        except (AnonymousUser.DoesNotExist, Exception):
-            # Si el usuario no existe devolvemos historial vacío
+        except AnonymousUser.DoesNotExist:
             return Response([], status=status.HTTP_200_OK)
 
         checks = user.checks.all()
@@ -122,58 +127,100 @@ class SourceStatsView(APIView):
     """
     GET /api/sources/
 
-    Devuelve estadísticas por fuente: cuántas noticias reales y falsas
-    se han detectado en cada fuente, y el porcentaje de fiabilidad.
-    El device_id se manda como header: X-Device-ID
+    Returns the top 5 most reliable news sources for the user,
+    based on their search history.
 
-    Respuesta:
+    Ordering criteria:
+        1. Primary:   number of articles labeled REAL (descending)
+        2. Tiebreak:  average confidence of REAL articles (descending)
+
+    Requires header: X-Device-ID
+
+    Response:
         [
             {
-                "source": "elpais.com",
-                "total": 10,
-                "real": 8,
-                "fake": 2,
-                "reliability_pct": 80.0   ← % de noticias REAL sobre el total
+                "source": "The New York Times",
+                "total": 2,
+                "real": 2,
+                "fake": 0,
+                "real_confidence_avg": 0.85,
+                "reliability_pct": 100.0
             },
             ...
         ]
+
+    Example (from the problem statement):
+        - BBC:              2 REAL @ 80% avg  → 2nd
+        - The New York Times: 2 REAL @ 85% avg → 1st (tiebreak: higher confidence)
+        - BuzzFeed:         1 REAL @ 81% avg  → 3rd
+        - Fox News:         0 REAL, 3 FAKE    → 4th
     """
 
     def get(self, request):
         device_id = request.headers.get("X-Device-ID")
         if not device_id:
             return Response(
-                {"error": "Falta el header X-Device-ID"},
+                {"error": "Missing X-Device-ID header"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             user = AnonymousUser.objects.get(id=device_id)
-        except (AnonymousUser.DoesNotExist, Exception):
+        except AnonymousUser.DoesNotExist:
             return Response([], status=status.HTTP_200_OK)
 
-        # Solo las noticias con fuente informada
+        # Only news checks with a source informed
         checks = user.checks.filter(source__isnull=False).exclude(source="")
 
-        # Agrupar manualmente por fuente
+        if not checks.exists():
+            return Response([], status=status.HTTP_200_OK)
+
+        # Group by source
         stats = {}
         for check in checks:
             src = check.source
             if src not in stats:
-                stats[src] = {"source": src, "total": 0, "real": 0, "fake": 0}
+                stats[src] = {
+                    "source": src,
+                    "total": 0,
+                    "real": 0,
+                    "fake": 0,
+                    "real_confidence_sum": 0.0,
+                }
             stats[src]["total"] += 1
             if check.label == "REAL":
                 stats[src]["real"] += 1
+                stats[src]["real_confidence_sum"] += check.confidence
             else:
                 stats[src]["fake"] += 1
 
-        # Calcular porcentaje de fiabilidad y ordenar de más a menos fiable
+        # Calculate reliability metrics
         result = []
         for src_data in stats.values():
-            src_data["reliability_pct"] = round(
-                src_data["real"] / src_data["total"] * 100, 1
-            )
-            result.append(src_data)
+            real_count = src_data["real"]
+            total = src_data["total"]
 
-        result.sort(key=lambda x: x["reliability_pct"], reverse=True)
-        return Response(result)
+            # Average confidence of REAL articles (used as tiebreaker)
+            real_confidence_avg = (
+                round(src_data["real_confidence_sum"] / real_count, 4)
+                if real_count > 0
+                else 0.0
+            )
+
+            result.append({
+                "source": src_data["source"],
+                "total": total,
+                "real": real_count,
+                "fake": src_data["fake"],
+                "real_confidence_avg": real_confidence_avg,
+                "reliability_pct": round(real_count / total * 100, 1),
+            })
+
+        # Sort: 1st by number of REAL articles (desc), 2nd by avg confidence (desc)
+        result.sort(
+            key=lambda x: (x["real"], x["real_confidence_avg"]),
+            reverse=True,
+        )
+
+        # Return top 5
+        return Response(result[:5])

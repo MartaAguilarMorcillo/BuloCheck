@@ -6,21 +6,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-# SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY = "django-insecure-6^q+o#ua^@7t0rsaukj&@3z5exo76ecjtyfg9whxhg83e5i)^l"
+# WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-# SECURITY WARNING: don't run with debug turned on in production!
+# WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG") == "True"
 
 ALLOWED_HOSTS = ["*"]
-
-
-# Application definition
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -64,8 +56,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "fakenews_backend.wsgi.application"
 
-
-# ── Base de datos PostgreSQL ───────────────────────────────────────────────
+# ── PostgreSQL database ────────────────────────────────────────────────────
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -77,35 +68,16 @@ DATABASES = {
     }
 }
 
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "Europe/Madrid"
-
 USE_I18N = True
-
 USE_TZ = True
 
 # ── Django REST Framework ──────────────────────────────────────────────────
@@ -118,19 +90,10 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = "static/"
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# ── HuggingFace Inference API ──────────────────────────────────────────────
-HF_API_TOKEN = os.getenv("HF_API_TOKEN")
-HF_MODEL_URL = os.getenv("HF_MODEL_URL")
-
-# En producción se cambia por CORS_ALLOWED_ORIGINS con mi dominio propio
+# ── CORS ───────────────────────────────────────────────────────────────────
+# In production replace with: CORS_ALLOWED_ORIGINS = ["https://your-domain.com"]
+# Change your-domain to my domain name
 CORS_ALLOW_ALL_ORIGINS = True
