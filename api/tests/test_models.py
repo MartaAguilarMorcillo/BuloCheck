@@ -2,8 +2,6 @@
 test_models.py — Model tests for AnonymousUser and NewsCheck.
 """
 
-import uuid
-
 from django.db import IntegrityError
 from django.test import TestCase
 

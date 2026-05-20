@@ -1,13 +1,9 @@
 """
 test_integration.py — Integration tests: full request → DB → response flow.
-
-These tests simulate the complete flow from the Chrome extension
-through the Django backend to PostgreSQL and back.
-The model call (gradio_client) is mocked to avoid network dependency.
 """
 
 import uuid
-from unittest.mock import patch
+from unittest.mock import patch  # ← corregido: era 'patchf'
 
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -32,17 +28,9 @@ MOCK_PREDICTION_REAL = {
 
 
 class FullFlowIntegrationTest(APITestCase):
-    """
-    Integration tests covering the complete user journey.
-    """
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_predict_then_history(self, _):
-        """
-        A user predicts a news article and then retrieves their history.
-        The predicted article must appear in the history with correct data.
-        """
-        # Step 1: predict
         predict_response = self.client.post(
             "/api/predict/",
             {
@@ -57,11 +45,10 @@ class FullFlowIntegrationTest(APITestCase):
         self.assertEqual(predict_response.status_code, status.HTTP_200_OK)
         self.assertEqual(predict_response.json()["label"], "FAKE")
 
-        # Step 2: retrieve history
         history_response = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(history_response.status_code, status.HTTP_200_OK)
 
-        history = history_response.json()
+        history = history_response.json()["results"]  # ← corregido
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0]["title"], SAMPLE_TITLE)
         self.assertEqual(history[0]["label"], "FAKE")
@@ -69,11 +56,6 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news")
     def test_predict_then_sources_ranking(self, mock_predict):
-        """
-        A user predicts multiple articles from different sources.
-        The sources endpoint returns them ranked correctly.
-        """
-        # Two REAL from NYT
         mock_predict.return_value = MOCK_PREDICTION_REAL
         for _ in range(2):
             self.client.post(
@@ -87,7 +69,6 @@ class FullFlowIntegrationTest(APITestCase):
                 format="json",
             )
 
-        # One FAKE from Fox News
         mock_predict.return_value = MOCK_PREDICTION_FAKE
         self.client.post(
             "/api/predict/",
@@ -100,7 +81,6 @@ class FullFlowIntegrationTest(APITestCase):
             format="json",
         )
 
-        # Check sources ranking
         sources_response = self.client.get("/api/sources/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(sources_response.status_code, status.HTTP_200_OK)
         data = sources_response.json()
@@ -109,13 +89,8 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_multiple_users_data_isolation(self, _):
-        """
-        Two different users predict articles.
-        Each user only sees their own history and sources.
-        """
         device_id_2 = str(uuid.uuid4())
 
-        # User 1 predicts
         self.client.post(
             "/api/predict/",
             {
@@ -127,7 +102,6 @@ class FullFlowIntegrationTest(APITestCase):
             format="json",
         )
 
-        # User 2 predicts
         self.client.post(
             "/api/predict/",
             {
@@ -139,25 +113,24 @@ class FullFlowIntegrationTest(APITestCase):
             format="json",
         )
 
-        # User 1 sees only their own news
-        history_1 = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()
+        history_1 = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()[
+            "results"
+        ]  # ← corregido
         titles_1 = [item["title"] for item in history_1]
         self.assertIn("User 1 news", titles_1)
         self.assertNotIn("User 2 news", titles_1)
 
-        # User 2 sees only their own news
         history_2 = self.client.get(
             "/api/history/", HTTP_X_DEVICE_ID=device_id_2
-        ).json()
+        ).json()[
+            "results"
+        ]  # ← corregido
         titles_2 = [item["title"] for item in history_2]
         self.assertIn("User 2 news", titles_2)
         self.assertNotIn("User 1 news", titles_2)
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_check_id_matches_db_record(self, _):
-        """
-        The check_id returned by /api/predict/ matches the actual DB record.
-        """
         response = self.client.post(
             "/api/predict/",
             {
@@ -175,9 +148,6 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news", side_effect=Exception("Space is sleeping"))
     def test_model_error_does_not_save_to_db(self, _):
-        """
-        When the model call fails, nothing is saved to the database.
-        """
         self.client.post(
             "/api/predict/",
             {
@@ -192,9 +162,6 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_same_user_multiple_predictions(self, _):
-        """
-        The same user can predict multiple articles and all are saved.
-        """
         for i in range(5):
             self.client.post(
                 "/api/predict/",
@@ -209,14 +176,13 @@ class FullFlowIntegrationTest(APITestCase):
         self.assertEqual(AnonymousUser.objects.count(), 1)
         self.assertEqual(NewsCheck.objects.count(), 5)
 
-        history = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()
+        history = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()[
+            "results"
+        ]  # ← corregido
         self.assertEqual(len(history), 5)
 
     @patch("api.views.predict_news")
     def test_sources_empty_before_any_prediction(self, _):
-        """
-        /api/sources/ returns empty list before any prediction is made.
-        """
         response = self.client.get("/api/sources/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json(), [])
