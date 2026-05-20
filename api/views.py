@@ -1,3 +1,4 @@
+from django.db import connection
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -89,22 +90,20 @@ class HistoryView(APIView):
     """
     GET /api/history/
 
-    Returns the list of news articles analyzed by the user.
+    Returns paginated list of news articles analyzed by the user.
     Requires header: X-Device-ID
 
+    Query params:
+        page      (optional) — page number, default 1
+        page_size (optional) — results per page, default 10, max 50
+
     Response:
-        [
-            {
-                "id": 1,
-                "title": "...",
-                "text": "...",
-                "source": "bbc.com",
-                "label": "REAL",
-                "confidence": 0.94,
-                "created_at": "2026-05-16T20:49:36Z"
-            },
-            ...
-        ]
+        {
+            "count": 45,
+            "total_pages": 5,
+            "current_page": 1,
+            "results": [ ... ]
+        }
     """
 
     def get(self, request):
@@ -118,11 +117,40 @@ class HistoryView(APIView):
         try:
             user = AnonymousUser.objects.get(id=device_id)
         except AnonymousUser.DoesNotExist:
-            return Response([], status=status.HTTP_200_OK)
+            return Response(
+                {"count": 0, "total_pages": 0, "current_page": 1, "results": []},
+                status=status.HTTP_200_OK,
+            )
+
+        # Pagination params
+        try:
+            page = max(1, int(request.query_params.get("page", 1)))
+        except ValueError:
+            page = 1
+
+        try:
+            page_size = min(50, max(1, int(request.query_params.get("page_size", 10))))
+        except ValueError:
+            page_size = 10
 
         checks = user.checks.all()
-        serializer = NewsCheckSerializer(checks, many=True)
-        return Response(serializer.data)
+        total = checks.count()
+        total_pages = max(1, -(-total // page_size))  # ceil division
+
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_checks = checks[start:end]
+
+        serializer = NewsCheckSerializer(page_checks, many=True)
+
+        return Response(
+            {
+                "count": total,
+                "total_pages": total_pages,
+                "current_page": page,
+                "results": serializer.data,
+            }
+        )
 
 
 class SourceStatsView(APIView):
@@ -228,3 +256,80 @@ class SourceStatsView(APIView):
 
         # Return top 5
         return Response(result[:5])
+
+
+class SimilarNewsView(APIView):
+    """
+    GET /api/similar/
+
+    Returns news articles already in the system whose title is similar
+    to the given title, using PostgreSQL pg_trgm trigram similarity.
+
+    This provides additional evidence for the prediction: if similar
+    articles have already been classified as FAKE or REAL, it reinforces
+    the model's prediction.
+
+    Query params:
+        title    (required) — title to search similarities for
+        min_sim  (optional) — minimum similarity threshold, default 0.3
+
+    Requires header: X-Device-ID
+
+    Response:
+        [
+            {
+                "title": "Trump loses the election",
+                "source": "BBC",
+                "label": "FAKE",
+                "similarity": 0.72
+            },
+            ...
+        ]
+    """
+
+    def get(self, request):
+        title = request.query_params.get("title", "").strip()
+        if not title:
+            return Response(
+                {"error": "Query parameter 'title' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Minimum similarity threshold — below 0.3 results are too noisy
+        try:
+            min_sim = float(request.query_params.get("min_sim", 0.3))
+        except ValueError:
+            min_sim = 0.3
+
+        # pg_trgm similarity search using raw SQL for performance
+        # similarity() returns a value between 0 and 1
+        # The GIN index on title makes this query fast
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    title,
+                    source,
+                    label,
+                    ROUND(similarity(title, %s)::numeric, 4) AS sim
+                FROM news_checks
+                WHERE similarity(title, %s) >= %s
+                ORDER BY sim DESC
+                LIMIT 5
+                """,
+                [title, title, min_sim],
+            )
+            rows = cursor.fetchall()
+
+        results = [
+            {
+                "title": row[0],
+                "source": row[1],
+                "label": row[2],
+                "similarity": float(row[3]),
+            }
+            for row in rows
+        ]
+
+        return Response(results)

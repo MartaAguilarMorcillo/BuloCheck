@@ -197,17 +197,22 @@ class HistoryViewTest(APITestCase):
     def setUp(self):
         self.user = make_user()
 
-    def _get(self, device_id=DEVICE_ID):
-        return self.client.get("/api/history/", HTTP_X_DEVICE_ID=device_id)
+    def _get(self, device_id=DEVICE_ID, page=1, page_size=10):
+        return self.client.get(
+            f"/api/history/?page={page}&page_size={page_size}",
+            HTTP_X_DEVICE_ID=device_id,
+        )
 
     def test_history_returns_200(self):
         """GET /api/history/ returns 200 with valid device_id."""
         self.assertEqual(self._get().status_code, status.HTTP_200_OK)
 
     def test_history_returns_empty_for_unknown_user(self):
-        """GET /api/history/ returns empty list for unknown device_id."""
+        """GET /api/history/ returns empty results for unknown device_id."""
         response = self._get(device_id=str(uuid.uuid4()))
-        self.assertEqual(response.json(), [])
+        data = response.json()
+        self.assertEqual(data["count"], 0)
+        self.assertEqual(data["results"], [])
 
     def test_history_returns_400_without_header(self):
         """GET /api/history/ returns 400 when X-Device-ID header is missing."""
@@ -219,29 +224,50 @@ class HistoryViewTest(APITestCase):
         make_check(self.user, title="News 1")
         make_check(self.user, title="News 2")
         make_check(self.user, title="News 3")
-        self.assertEqual(len(self._get().json()), 3)
+        data = self._get().json()
+        self.assertEqual(data["count"], 3)
+        self.assertEqual(len(data["results"]), 3)
 
     def test_history_does_not_return_other_users_checks(self):
         """GET /api/history/ only returns checks for the requesting user."""
         other_user = AnonymousUser.objects.create(id=str(uuid.uuid4()))
         make_check(self.user, title="My news")
         make_check(other_user, title="Other user news")
-        titles = [item["title"] for item in self._get().json()]
+        titles = [item["title"] for item in self._get().json()["results"]]
         self.assertIn("My news", titles)
         self.assertNotIn("Other user news", titles)
 
     def test_history_ordered_newest_first(self):
         """GET /api/history/ returns checks ordered newest first."""
-        make_check(self.user, title="First")
-        make_check(self.user, title="Second")
-        data = self._get().json()
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        check1 = make_check(self.user, title="First")
+        check1.created_at = timezone.now() - timedelta(seconds=10)
+        check1.save()
+
+        check2 = make_check(self.user, title="Second")
+        check2.created_at = timezone.now()
+        check2.save()
+
+        data = self._get().json()["results"]
         self.assertEqual(data[0]["title"], "Second")
         self.assertEqual(data[1]["title"], "First")
 
     def test_history_response_fields(self):
-        """GET /api/history/ response items contain expected fields."""
+        """GET /api/history/ response contains pagination fields."""
         make_check(self.user)
-        item = self._get().json()[0]
+        data = self._get().json()
+        self.assertIn("count", data)
+        self.assertIn("total_pages", data)
+        self.assertIn("current_page", data)
+        self.assertIn("results", data)
+
+    def test_history_result_item_fields(self):
+        """Each result item contains the expected news check fields."""
+        make_check(self.user)
+        item = self._get().json()["results"][0]
         for field in [
             "id",
             "title",
@@ -252,6 +278,24 @@ class HistoryViewTest(APITestCase):
             "created_at",
         ]:
             self.assertIn(field, item)
+
+    def test_history_pagination(self):
+        """GET /api/history/ paginates correctly."""
+        for i in range(15):
+            make_check(self.user, title=f"News {i}")
+        data = self._get(page=1, page_size=10).json()
+        self.assertEqual(data["count"], 15)
+        self.assertEqual(data["total_pages"], 2)
+        self.assertEqual(data["current_page"], 1)
+        self.assertEqual(len(data["results"]), 10)
+
+    def test_history_second_page(self):
+        """GET /api/history/ second page returns remaining items."""
+        for i in range(15):
+            make_check(self.user, title=f"News {i}")
+        data = self._get(page=2, page_size=10).json()
+        self.assertEqual(len(data["results"]), 5)
+        self.assertEqual(data["current_page"], 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -378,3 +422,68 @@ class SourceStatsViewTest(APITestCase):
         self.assertEqual(sources[1], "bbc.com")
         self.assertEqual(sources[2], "buzzfeed.com")
         self.assertEqual(sources[3], "foxnews.com")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/similar/
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class SimilarNewsViewTest(APITestCase):
+    """API tests for GET /api/similar/."""
+
+    def setUp(self):
+        self.user = AnonymousUser.objects.create(id=DEVICE_ID)
+        make_check(
+            self.user,
+            title="Facebook Continues To Host Militant Groups Despite Ban",
+            label="REAL",
+            source="buzzfeednews.com",
+        )
+
+    def test_similar_returns_200(self):
+        """GET /api/similar/ returns 200 with valid title."""
+        response = self.client.get(
+            "/api/similar/?title=Extremist groups thrive on Facebook despite bans"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_similar_returns_400_without_title(self):
+        """GET /api/similar/ returns 400 when title param is missing."""
+        response = self.client.get("/api/similar/")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_similar_returns_results_above_threshold(self):
+        """GET /api/similar/ returns articles above the similarity threshold."""
+        response = self.client.get(
+            "/api/similar/?title=Facebook groups militant ban&min_sim=0.2"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.json()
+        for item in data:
+            self.assertGreaterEqual(item["similarity"], 0.2)
+
+    def test_similar_response_fields(self):
+        """Response items contain title, source, label and similarity."""
+        response = self.client.get(
+            "/api/similar/?title=Facebook groups militant ban&min_sim=0.2"
+        )
+        if response.json():
+            item = response.json()[0]
+            self.assertIn("title", item)
+            self.assertIn("source", item)
+            self.assertIn("label", item)
+            self.assertIn("similarity", item)
+
+    def test_similar_returns_empty_when_no_match(self):
+        """GET /api/similar/ returns empty list when nothing is similar."""
+        response = self.client.get(
+            "/api/similar/?title=Completely unrelated topic about cooking recipes"
+        )
+        self.assertEqual(response.json(), [])
+
+    def test_similar_custom_min_sim(self):
+        """GET /api/similar/ respects custom min_sim parameter."""
+        response = self.client.get("/api/similar/?title=Facebook ban&min_sim=0.99")
+        # With threshold 0.99 nothing should match except exact titles
+        self.assertEqual(response.json(), [])
