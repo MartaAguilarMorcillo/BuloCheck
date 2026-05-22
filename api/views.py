@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from .ml import predict_news
 from .models import AnonymousUser, NewsCheck
 from .serializers import NewsCheckSerializer, PredictRequestSerializer
+from .validators import validate_body, validate_title
 
 
 class PredictView(APIView):
@@ -33,21 +34,36 @@ class PredictView(APIView):
     """
 
     def post(self, request):
-        # 1. Validate input
+        # 1. Validate format
         serializer = PredictRequestSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
-        device_id = data["device_id"]
         title = data["title"]
         text = data["text"]
+
+        # 2. Validate content
+        title_validation = validate_title(title)
+        body_validation = validate_body(text)
+
+        errors = title_validation.errors + body_validation.errors
+        if errors:
+            return Response(
+                {"validation_errors": errors},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        # Collect warnings (non-blocking — language detection etc.)
+        warnings = title_validation.warnings + body_validation.warnings
+
+        device_id = data["device_id"]
         source = data.get("source") or None
 
-        # 2. Get or create anonymous user by device_id
+        # 3. Get or create anonymous user
         user, _ = AnonymousUser.objects.get_or_create(id=device_id)
 
-        # 3. Call the model
+        # 4. Call the model
         try:
             result = predict_news(title=title, text=text)
         except Exception as e:
@@ -64,7 +80,7 @@ class PredictView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        # 4. Save to database
+        # 5. Save to database
         check = NewsCheck.objects.create(
             user=user,
             title=title,
@@ -74,16 +90,17 @@ class PredictView(APIView):
             confidence=result["confidence"],
         )
 
-        # 5. Return result
-        return Response(
-            {
-                "label": result["label"],
-                "confidence": result["confidence"],
-                "probas": result["probas"],
-                "check_id": check.id,
-            },
-            status=status.HTTP_200_OK,
-        )
+        # 6. Return result — include warnings if any
+        response_data = {
+            "label": result["label"],
+            "confidence": result["confidence"],
+            "probas": result["probas"],
+            "check_id": check.id,
+        }
+        if warnings:
+            response_data["warnings"] = warnings
+
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class HistoryView(APIView):

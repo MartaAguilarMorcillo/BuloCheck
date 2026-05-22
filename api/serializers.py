@@ -4,10 +4,10 @@ from .models import NewsCheck
 
 
 class PredictRequestSerializer(serializers.Serializer):
-    """Valida los datos de entrada del endpoint /api/predict/"""
+    """Validates the input data for /api/predict/"""
 
-    title = serializers.CharField(max_length=1000)
-    text = serializers.CharField()
+    title = serializers.CharField(max_length=1000, allow_blank=True)
+    text = serializers.CharField(allow_blank=True)
     source = serializers.CharField(max_length=500, required=False, allow_blank=True)
     device_id = serializers.UUIDField()
 
