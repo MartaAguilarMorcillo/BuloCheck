@@ -16,7 +16,6 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from api.models import AnonymousUser
 from api.validators import (
     validate_body,
     validate_language,
