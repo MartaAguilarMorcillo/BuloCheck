@@ -280,17 +280,20 @@ class SimilarNewsView(APIView):
     GET /api/similar/
 
     Returns news articles already in the system whose title is similar
-    to the given title, using PostgreSQL pg_trgm trigram similarity.
+    to the given title, using a hybrid search strategy:
 
-    This provides additional evidence for the prediction: if similar
-    articles have already been classified as FAKE or REAL, it reinforces
-    the model's prediction.
+      1. pg_trgm trigram similarity — finds lexically similar titles
+         (same words, typos, partial matches)
+      2. PostgreSQL full-text search (tsvector/tsquery) — finds semantically
+         related titles even when vocabulary differs
+         (e.g. "loses" matches "defeat" via stemming)
+
+    Both strategies use GIN indexes for fast lookup.
+    Results are ranked by a combined score: trgm_sim + fts_rank.
 
     Query params:
         title    (required) — title to search similarities for
-        min_sim  (optional) — minimum similarity threshold, default 0.3
-
-    Requires header: X-Device-ID
+        min_sim  (optional) — minimum trigram similarity threshold, default 0.15
 
     Response:
         [
@@ -298,7 +301,8 @@ class SimilarNewsView(APIView):
                 "title": "Trump loses the election",
                 "source": "BBC",
                 "label": "FAKE",
-                "similarity": 0.72
+                "similarity": 0.72,
+                "match_type": "trigram+fulltext" | "trigram" | "fulltext"
             },
             ...
         ]
@@ -312,15 +316,10 @@ class SimilarNewsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Minimum similarity threshold — below 0.3 results are too noisy
         try:
-            min_sim = float(request.query_params.get("min_sim", 0.3))
+            min_sim = float(request.query_params.get("min_sim", 0.25))
         except ValueError:
-            min_sim = 0.3
-
-        # pg_trgm similarity search using raw SQL for performance
-        # similarity() returns a value between 0 and 1
-        # The GIN index on title makes this query fast
+            min_sim = 0.25
 
         with connection.cursor() as cursor:
             cursor.execute(
@@ -329,13 +328,53 @@ class SimilarNewsView(APIView):
                     title,
                     source,
                     label,
-                    ROUND(similarity(title, %s)::numeric, 4) AS sim
+                    ROUND(COALESCE(similarity(title, %s), 0)::numeric, 4) AS trgm_sim,
+                    ROUND(COALESCE(
+                        ts_rank(to_tsvector('english', title), plainto_tsquery('english', %s)
+                    ), 0)::numeric, 4) AS fts_rank,
+                    CASE
+                        WHEN similarity(title, %s) >= %s
+                        AND to_tsvector('english', title) @@ plainto_tsquery('english', %s)
+                        THEN 'trigram+fulltext'
+                        WHEN similarity(title, %s) >= %s
+                        THEN 'trigram'
+                        ELSE 'fulltext'
+                    END AS match_type
                 FROM news_checks
-                WHERE similarity(title, %s) >= %s
-                ORDER BY sim DESC
+                WHERE
+                    (
+                        similarity(title, %s) >= %s
+                        OR ts_rank(
+                            to_tsvector('english', title),
+                            plainto_tsquery('english', %s)
+                        ) >= %s
+                    )
+                    AND title != %s  -- exclude the exact same title
+                ORDER BY (
+                    COALESCE(similarity(title, %s), 0)
+                    + COALESCE(ts_rank(
+                        to_tsvector('english', title),
+                        plainto_tsquery('english', %s)
+                    ), 0)
+                ) DESC
                 LIMIT 5
                 """,
-                [title, title, min_sim],
+                [
+                    title,  # trgm_sim SELECT
+                    title,  # fts_rank SELECT
+                    title,
+                    min_sim,  # CASE trigram+fulltext
+                    title,  # CASE fts check
+                    title,
+                    min_sim,  # CASE trigram only
+                    title,
+                    min_sim,  # WHERE trgm condition
+                    title,
+                    min_sim,  # WHERE fts condition
+                    title,  # WHERE exclude exact match  ← nuevo
+                    title,  # ORDER BY trgm
+                    title,  # ORDER BY fts
+                ],
             )
             rows = cursor.fetchall()
 
@@ -345,6 +384,8 @@ class SimilarNewsView(APIView):
                 "source": row[1],
                 "label": row[2],
                 "similarity": float(row[3]),
+                "fts_rank": float(row[4]),
+                "match_type": row[5],
             }
             for row in rows
         ]

@@ -430,21 +430,29 @@ class SourceStatsViewTest(APITestCase):
 
 
 class SimilarNewsViewTest(APITestCase):
-    """API tests for GET /api/similar/."""
+    """API tests for GET /api/similar/ with hybrid trgm + full-text search."""
 
     def setUp(self):
-        self.user = AnonymousUser.objects.create(id=DEVICE_ID)
+        self.user = make_user()
+        # Lexically similar title (trgm will find it)
         make_check(
             self.user,
             title="Facebook Continues To Host Militant Groups Despite Ban",
             label="REAL",
             source="buzzfeednews.com",
         )
+        # Semantically related title (full-text will find it via stemming)
+        make_check(
+            self.user,
+            title="Trump loses the presidential election by wide margin",
+            label="FAKE",
+            source="bbc.com",
+        )
 
     def test_similar_returns_200(self):
         """GET /api/similar/ returns 200 with valid title."""
         response = self.client.get(
-            "/api/similar/?title=Extremist groups thrive on Facebook despite bans"
+            "/api/similar/?title=Facebook groups militant ban extremism"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -453,37 +461,82 @@ class SimilarNewsViewTest(APITestCase):
         response = self.client.get("/api/similar/")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_similar_returns_results_above_threshold(self):
-        """GET /api/similar/ returns articles above the similarity threshold."""
+    def test_similar_response_fields(self):
+        """Response items contain title, source, label, similarity, fts_rank, match_type."""
         response = self.client.get(
-            "/api/similar/?title=Facebook groups militant ban&min_sim=0.2"
+            "/api/similar/?title=Facebook groups militant ban&min_sim=0.1"
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = response.json()
-        for item in data:
-            self.assertGreaterEqual(item["similarity"], 0.2)
-
-    def test_similar_response_fields(self):
-        """Response items contain title, source, label and similarity."""
-        response = self.client.get(
-            "/api/similar/?title=Facebook groups militant ban&min_sim=0.2"
-        )
         if response.json():
             item = response.json()[0]
             self.assertIn("title", item)
             self.assertIn("source", item)
             self.assertIn("label", item)
             self.assertIn("similarity", item)
+            self.assertIn("fts_rank", item)
+            self.assertIn("match_type", item)
 
     def test_similar_returns_empty_when_no_match(self):
-        """GET /api/similar/ returns empty list when nothing is similar."""
+        """GET /api/similar/ returns empty list when nothing matches."""
         response = self.client.get(
-            "/api/similar/?title=Completely unrelated topic about cooking recipes"
+            "/api/similar/?title=Cooking recipes pasta carbonara italian cuisine&min_sim=0.9"
         )
         self.assertEqual(response.json(), [])
+
+    def test_similar_trigram_match(self):
+        """pg_trgm finds lexically similar titles."""
+        response = self.client.get(
+            "/api/similar/?title=Facebook Continues Hosting Militant Groups Ban&min_sim=0.2"
+        )
+        titles = [item["title"] for item in response.json()]
+        self.assertIn("Facebook Continues To Host Militant Groups Despite Ban", titles)
+
+    def test_similar_fulltext_match(self):
+        """Full-text search finds semantically related titles via stemming."""
+        # "lost" stems to "loss", "election" stems to "elect" — matches "loses" and "election"
+        response = self.client.get(
+            "/api/similar/?title=Trump lost the election defeat&min_sim=0.01"
+        )
+        titles = [item["title"] for item in response.json()]
+        self.assertIn("Trump loses the presidential election by wide margin", titles)
+
+    def test_similar_match_type_field(self):
+        """match_type is one of: trigram+fulltext, trigram, fulltext."""
+        response = self.client.get(
+            "/api/similar/?title=Facebook groups militant ban&min_sim=0.1"
+        )
+        valid_match_types = {"trigram+fulltext", "trigram", "fulltext"}
+        for item in response.json():
+            self.assertIn(item["match_type"], valid_match_types)
 
     def test_similar_custom_min_sim(self):
         """GET /api/similar/ respects custom min_sim parameter."""
         response = self.client.get("/api/similar/?title=Facebook ban&min_sim=0.99")
-        # With threshold 0.99 nothing should match except exact titles
-        self.assertEqual(response.json(), [])
+        # With trgm threshold 0.99 only exact matches pass trgm,
+        # but fulltext can still match
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_similar_returns_max_5_results(self):
+        """GET /api/similar/ returns at most 5 results."""
+        # Add more similar articles
+        for i in range(6):
+            make_check(
+                self.user,
+                title=f"Facebook militant groups ban extremism report {i}",
+                label="FAKE",
+                source="cnn.com",
+            )
+        response = self.client.get(
+            "/api/similar/?title=Facebook militant groups ban&min_sim=0.1"
+        )
+        self.assertLessEqual(len(response.json()), 5)
+
+    def test_similar_excludes_exact_title(self):
+        """GET /api/similar/ does not return the exact same title being searched."""
+        response = self.client.get(
+            "/api/similar/?title=Facebook Continues To Host Militant Groups Despite Ban&min_sim=0.1"
+        )
+        titles = [item["title"] for item in response.json()]
+        self.assertNotIn(
+            "Facebook Continues To Host Militant Groups Despite Ban", titles
+        )
