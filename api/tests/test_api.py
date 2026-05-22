@@ -489,9 +489,7 @@ class SimilarNewsViewTest(APITestCase):
             "/api/similar/?title=Facebook Continues Hosting Militant Groups Ban&min_sim=0.2"
         )
         titles = [item["title"] for item in response.json()]
-        self.assertIn(
-            "Facebook Continues To Host Militant Groups Despite Ban", titles
-        )
+        self.assertIn("Facebook Continues To Host Militant Groups Despite Ban", titles)
 
     def test_similar_fulltext_match(self):
         """Full-text search finds semantically related titles via stemming."""
@@ -500,9 +498,7 @@ class SimilarNewsViewTest(APITestCase):
             "/api/similar/?title=Trump lost the election defeat&min_sim=0.01"
         )
         titles = [item["title"] for item in response.json()]
-        self.assertIn(
-            "Trump loses the presidential election by wide margin", titles
-        )
+        self.assertIn("Trump loses the presidential election by wide margin", titles)
 
     def test_similar_match_type_field(self):
         """match_type is one of: trigram+fulltext, trigram, fulltext."""
@@ -515,9 +511,7 @@ class SimilarNewsViewTest(APITestCase):
 
     def test_similar_custom_min_sim(self):
         """GET /api/similar/ respects custom min_sim parameter."""
-        response = self.client.get(
-            "/api/similar/?title=Facebook ban&min_sim=0.99"
-        )
+        response = self.client.get("/api/similar/?title=Facebook ban&min_sim=0.99")
         # With trgm threshold 0.99 only exact matches pass trgm,
         # but fulltext can still match
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -536,7 +530,7 @@ class SimilarNewsViewTest(APITestCase):
             "/api/similar/?title=Facebook militant groups ban&min_sim=0.1"
         )
         self.assertLessEqual(len(response.json()), 5)
-    
+
     def test_similar_excludes_exact_title(self):
         """GET /api/similar/ does not return the exact same title being searched."""
         response = self.client.get(

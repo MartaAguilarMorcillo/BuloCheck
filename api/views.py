@@ -360,16 +360,20 @@ class SimilarNewsView(APIView):
                 LIMIT 5
                 """,
                 [
-                    title,            # trgm_sim SELECT
-                    title,            # fts_rank SELECT
-                    title, min_sim,   # CASE trigram+fulltext
-                    title,            # CASE fts check
-                    title, min_sim,   # CASE trigram only
-                    title, min_sim,   # WHERE trgm condition
-                    title, min_sim,   # WHERE fts condition
-                    title,            # WHERE exclude exact match  ← nuevo
-                    title,            # ORDER BY trgm
-                    title,            # ORDER BY fts
+                    title,  # trgm_sim SELECT
+                    title,  # fts_rank SELECT
+                    title,
+                    min_sim,  # CASE trigram+fulltext
+                    title,  # CASE fts check
+                    title,
+                    min_sim,  # CASE trigram only
+                    title,
+                    min_sim,  # WHERE trgm condition
+                    title,
+                    min_sim,  # WHERE fts condition
+                    title,  # WHERE exclude exact match  ← nuevo
+                    title,  # ORDER BY trgm
+                    title,  # ORDER BY fts
                 ],
             )
             rows = cursor.fetchall()
