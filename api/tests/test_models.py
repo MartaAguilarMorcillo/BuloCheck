@@ -2,8 +2,11 @@
 test_models.py — Model tests for AnonymousUser and NewsCheck.
 """
 
+from datetime import timedelta
+
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 
 from api.models import AnonymousUser, NewsCheck
 
@@ -20,7 +23,7 @@ def make_check(
     user,
     label="REAL",
     confidence=0.75,
-    source="bbc.com",
+    news_source=None,
     title=SAMPLE_TITLE,
     text=SAMPLE_TEXT,
 ):
@@ -28,7 +31,7 @@ def make_check(
         user=user,
         title=title,
         text=text,
-        source=source,
+        news_source=news_source,
         label=label,
         confidence=confidence,
     )
@@ -75,14 +78,11 @@ class NewsCheckModelTest(TestCase):
         self.user = make_user()
 
     def test_create_news_check(self):
-        """NewsCheck is created with all fields."""
         check = make_check(self.user)
         self.assertEqual(check.label, "REAL")
-        self.assertEqual(check.source, "bbc.com")
         self.assertAlmostEqual(check.confidence, 0.75)
 
     def test_source_is_optional(self):
-        """NewsCheck can be created without a source."""
         check = NewsCheck.objects.create(
             user=self.user,
             title=SAMPLE_TITLE,
@@ -90,7 +90,7 @@ class NewsCheckModelTest(TestCase):
             label="FAKE",
             confidence=0.9,
         )
-        self.assertIsNone(check.source)
+        self.assertIsNone(check.news_source)
 
     def test_label_real(self):
         """Label can be set to REAL."""
@@ -109,9 +109,14 @@ class NewsCheckModelTest(TestCase):
         self.assertIn("90%", str(check))
 
     def test_ordering_by_created_at_desc(self):
-        """NewsChecks are ordered by created_at descending."""
-        make_check(self.user, title="First news")
-        make_check(self.user, title="Second news")
+        check1 = make_check(self.user, title="First news")
+        check1.created_at = timezone.now() - timedelta(seconds=10)
+        check1.save()
+
+        check2 = make_check(self.user, title="Second news")
+        check2.created_at = timezone.now()
+        check2.save()
+
         checks = list(NewsCheck.objects.all())
         self.assertEqual(checks[0].title, "Second news")
         self.assertEqual(checks[1].title, "First news")
