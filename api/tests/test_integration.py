@@ -36,7 +36,7 @@ class FullFlowIntegrationTest(APITestCase):
             {
                 "title": SAMPLE_TITLE,
                 "text": SAMPLE_TEXT,
-                "source": "bbc.com",
+                "domain": "bbc.com",
                 "device_id": DEVICE_ID,
             },
             format="json",
@@ -48,11 +48,11 @@ class FullFlowIntegrationTest(APITestCase):
         history_response = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(history_response.status_code, status.HTTP_200_OK)
 
-        history = history_response.json()["results"]  # ← corregido
+        history = history_response.json()["results"]
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0]["title"], SAMPLE_TITLE)
         self.assertEqual(history[0]["label"], "FAKE")
-        self.assertEqual(history[0]["source"], "bbc.com")
+        self.assertEqual(history[0]["news_source"]["domain"], "bbc.com")
 
     @patch("api.views.predict_news")
     def test_predict_then_sources_ranking(self, mock_predict):
@@ -63,7 +63,7 @@ class FullFlowIntegrationTest(APITestCase):
                 {
                     "title": SAMPLE_TITLE,
                     "text": SAMPLE_TEXT,
-                    "source": "nytimes.com",
+                    "domain": "nytimes.com",
                     "device_id": DEVICE_ID,
                 },
                 format="json",
@@ -75,7 +75,7 @@ class FullFlowIntegrationTest(APITestCase):
             {
                 "title": SAMPLE_TITLE,
                 "text": SAMPLE_TEXT,
-                "source": "foxnews.com",
+                "domain": "foxnews.com",
                 "device_id": DEVICE_ID,
             },
             format="json",
@@ -84,17 +84,18 @@ class FullFlowIntegrationTest(APITestCase):
         sources_response = self.client.get("/api/sources/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(sources_response.status_code, status.HTTP_200_OK)
         data = sources_response.json()
-        self.assertEqual(data[0]["source"], "nytimes.com")
-        self.assertEqual(data[1]["source"], "foxnews.com")
+        self.assertEqual(data[0]["news_source"]["domain"], "nytimes.com")
+        self.assertEqual(data[1]["news_source"]["domain"], "foxnews.com")
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_multiple_users_data_isolation(self, _):
         device_id_2 = str(uuid.uuid4())
 
+        # Titles long enough to pass content validation
         self.client.post(
             "/api/predict/",
             {
-                "title": "User 1 news",
+                "title": "User one reads breaking news about the economy today",
                 "text": SAMPLE_TEXT,
                 "source": "bbc.com",
                 "device_id": DEVICE_ID,
@@ -105,7 +106,7 @@ class FullFlowIntegrationTest(APITestCase):
         self.client.post(
             "/api/predict/",
             {
-                "title": "User 2 news",
+                "title": "User two reads breaking news about politics this week",
                 "text": SAMPLE_TEXT,
                 "source": "cnn.com",
                 "device_id": device_id_2,
@@ -115,19 +116,21 @@ class FullFlowIntegrationTest(APITestCase):
 
         history_1 = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()[
             "results"
-        ]  # ← corregido
+        ]
         titles_1 = [item["title"] for item in history_1]
-        self.assertIn("User 1 news", titles_1)
-        self.assertNotIn("User 2 news", titles_1)
+        self.assertIn("User one reads breaking news about the economy today", titles_1)
+        self.assertNotIn(
+            "User two reads breaking news about politics this week", titles_1
+        )
 
         history_2 = self.client.get(
             "/api/history/", HTTP_X_DEVICE_ID=device_id_2
-        ).json()[
-            "results"
-        ]  # ← corregido
+        ).json()["results"]
         titles_2 = [item["title"] for item in history_2]
-        self.assertIn("User 2 news", titles_2)
-        self.assertNotIn("User 1 news", titles_2)
+        self.assertIn("User two reads breaking news about politics this week", titles_2)
+        self.assertNotIn(
+            "User one reads breaking news about the economy today", titles_2
+        )
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_check_id_matches_db_record(self, _):
@@ -162,11 +165,19 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_same_user_multiple_predictions(self, _):
-        for i in range(5):
+        titles = [
+            "Scientists discover new evidence of climate change in Arctic region",
+            "Government announces major economic reform plan for next year",
+            "Technology company launches revolutionary artificial intelligence product",
+            "Sports team wins championship after decades of unsuccessful attempts",
+            "Health experts warn about new virus spreading across multiple countries",
+        ]
+
+        for title in titles:
             self.client.post(
                 "/api/predict/",
                 {
-                    "title": f"News article {i}",
+                    "title": title,
                     "text": SAMPLE_TEXT,
                     "device_id": DEVICE_ID,
                 },
@@ -178,7 +189,7 @@ class FullFlowIntegrationTest(APITestCase):
 
         history = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()[
             "results"
-        ]  # ← corregido
+        ]
         self.assertEqual(len(history), 5)
 
     @patch("api.views.predict_news")

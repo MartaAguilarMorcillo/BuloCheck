@@ -1,33 +1,17 @@
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "setTitle",
-    title: "Set as BuloCheck title",
-    contexts: ["selection"],
-  });
+/**
+ * background.js — Service worker (Manifest V3).
+ *
+ * Handles tasks that need to run outside the popup lifecycle:
+ *  - Opening new tabs (Search on the web, source website)
+ *  - Keeping the extension alive during long API calls if needed
+ */
 
-  chrome.contextMenus.create({
-    id: "setBody",
-    title: "Set as BuloCheck article body",
-    contexts: ["selection"],
-  });
-});
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
-chrome.contextMenus.onClicked.addListener((info) => {
-  if (!info.selectionText) return;
-
-  if (info.menuItemId === "setTitle") {
-    chrome.storage.local.set({
-      selectedTitle: info.selectionText,
-    });
-
-    console.log("Title saved:", info.selectionText);
+  if (message.type === "OPEN_TAB") {
+    chrome.tabs.create({ url: message.url });
+    sendResponse({ ok: true });
+    return true;
   }
 
-  if (info.menuItemId === "setBody") {
-    chrome.storage.local.set({
-      selectedBody: info.selectionText,
-    });
-
-    console.log("Body saved:", info.selectionText);
-  }
 });

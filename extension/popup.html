@@ -1,179 +1,210 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>BuloCheck</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BuloCheck</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
 
-    <style>
-      :root {
-        --bg-dark: #0f172a;
-        --card-bg: #1e293b;
-        --primary: #3b82f6;
-        --primary-hover: #2563eb;
-        --secondary: #334155;
-        --text-main: #f8fafc;
-        --text-muted: #94a3b8;
-        --danger: #ef4444;
-        --success: #22c55e;
-      }
-
-      body {
-        font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        width: 320px;
-        padding: 20px;
-        background: var(--bg-dark);
-        color: var(--text-main);
-        margin: 0;
-      }
-
-      h2 {
-        text-align: center;
-        margin: 0 0 20px 0;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        color: var(--primary);
-      }
-
-      .section {
-        margin-bottom: 16px;
-      }
-
-      .label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--text-muted);
-        margin-bottom: 6px;
-        font-weight: 700;
-      }
-
-      .box {
-        background: var(--card-bg);
-        padding: 12px;
-        border-radius: 10px;
-        max-height: 80px;
-        overflow-y: auto;
-        font-size: 13px;
-        line-height: 1.4;
-        border: 1px solid #334155;
-        transition: all 0.3s ease;
-      }
-
-      #resultBox {
-        max-height: none;
-        font-weight: 600;
-        text-align: center;
-        border: 2px solid transparent;
-      }
-
-      .confidence-container {
-        height: 6px;
-        background: #00000033;
-        border-radius: 10px;
-        margin-top: 8px;
-        display: none;
-        overflow: hidden;
-      }
-
-      #confidenceBar {
-        height: 100%;
-        width: 0%;
-        border-radius: 10px;
-        transition: width 0.5s ease-in-out;
-      }
-
-      button {
-        width: 100%;
-        padding: 12px;
-        border: none;
-        border-radius: 10px;
-        background: var(--primary);
-        color: white;
-        font-weight: 700;
-        cursor: pointer;
-        transition:
-          transform 0.1s,
-          background 0.2s;
-        margin-top: 10px;
-      }
-
-      button:active {
-        transform: scale(0.98);
-      }
-
-      button:hover {
-        background: var(--primary-hover);
-      }
-
-      .secondary-btn {
-        background: var(--secondary);
-        font-size: 12px;
-        padding: 8px;
-      }
-
-      .status {
-        margin-top: 15px;
-        text-align: center;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 700;
-        color: var(--text-muted);
-      }
-
-      .is-fake {
-        border-color: var(--danger) !important;
-        color: var(--danger);
-      }
-
-      .is-real {
-        border-color: var(--success) !important;
-        color: var(--success);
-      }
-    </style>
-  </head>
-
-  <body>
-    <h2>BuloCheck</h2>
-
-    <div class="section">
-      <div class="label">Selected Title</div>
-      <div class="box" id="titleBox">
-        No title selected
-      </div>
+  <!-- ── Header ────────────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header__logo">
+      <img src="icons/icon48.png" alt="BuloCheck" class="header__icon" />
+      <span class="header__title">BuloCheck</span>
     </div>
+    <span class="header__tagline">Fake News Detector</span>
+  </header>
 
-    <div class="section">
-      <div class="label">Selected Article Body</div>
-      <div class="box" id="bodyBox">
-        No body selected
-      </div>
-    </div>
-
-    <div class="section">
-      <div class="label">Prediction</div>
-
-      <div class="box" id="resultBox">
-        No prediction yet
-      </div>
-
-      <div class="confidence-container" id="confWrapper">
-        <div id="confidenceBar"></div>
-      </div>
-    </div>
-
-    <button id="analyze">
-      Analyze Article
+  <!-- ── Tab navigation ────────────────────────────────────────────── -->
+  <nav class="tabs">
+    <button class="tab-btn tab-btn--active" data-tab="analyze">
+      🔍 Analyze
     </button>
-
-    <button id="clear" class="secondary-btn">
-      Clear Selection
+    <button class="tab-btn" data-tab="history">
+      📰 History
     </button>
+    <button class="tab-btn" data-tab="similar">
+      🔗 Similar
+    </button>
+    <button class="tab-btn" data-tab="sources">
+      🏆 Sources
+    </button>
+  </nav>
 
-    <div class="status" id="status">
-      Ready
+  <!-- ── Tab 1: Analyze ────────────────────────────────────────────── -->
+  <section class="tab-panel tab-panel--active" id="tab-analyze">
+
+    <!-- Analysis mode (default) -->
+    <div id="analyze-mode">
+
+      <!-- Title -->
+      <div class="field-group">
+        <div class="field-group__buttons">
+          <button class="btn btn--secondary btn--sm" id="btn-select-title">
+            Select title
+          </button>
+          <button class="btn btn--ghost btn--sm hidden" id="btn-remove-title">
+            ✕ Remove
+          </button>
+        </div>
+        <div class="field-box" id="box-title">
+          <span class="field-box__placeholder">No title selected yet</span>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="field-group">
+        <div class="field-group__buttons">
+          <button class="btn btn--secondary btn--sm" id="btn-select-body">
+            Select article body
+          </button>
+          <button class="btn btn--ghost btn--sm hidden" id="btn-remove-body">
+            ✕ Remove
+          </button>
+        </div>
+        <div class="field-box field-box--tall" id="box-body">
+          <span class="field-box__placeholder">No body selected yet</span>
+        </div>
+      </div>
+
+      <!-- Source -->
+      <div class="source-row" id="source-row">
+        <span class="source-row__label">Source:</span>
+        <span class="source-row__value" id="source-display">
+          Pending detection…
+        </span>
+      </div>
+
+      <!-- Analyze button -->
+      <button class="btn btn--primary btn--full" id="btn-analyze" disabled>
+        Analyze article
+      </button>
+
+      <!-- Loading state -->
+      <div class="loading hidden" id="loading">
+        <div class="loading__spinner"></div>
+        <span>Analyzing… this may take a moment</span>
+      </div>
+
+      <!-- Error state -->
+      <div class="error-box hidden" id="error-box">
+        <span id="error-message"></span>
+      </div>
+
+    </div><!-- /analyze-mode -->
+
+    <!-- Result mode (shown after prediction or when coming from history/similar) -->
+    <div id="result-mode" class="hidden">
+
+      <!-- Verdict image -->
+      <div class="verdict" id="verdict">
+        <!-- Injected by JS: verdict--real or verdict--fake -->
+      </div>
+
+      <!-- Donut chart -->
+      <div class="chart-wrapper">
+        <canvas id="donut-chart" width="160" height="160"></canvas>
+        <div class="chart-center">
+          <span id="chart-pct"></span>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-dot legend-dot--real"></span> Real
+          <span class="legend-dot legend-dot--fake"></span> Fake
+        </div>
+      </div>
+
+      <!-- Source result -->
+      <div class="source-result" id="source-result">
+        <span class="source-result__label">Source</span>
+        <div class="source-result__content" id="source-result-content"></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="result-actions">
+        <button class="btn btn--ghost btn--sm" id="btn-search-web">
+          🔎 Search on the web
+        </button>
+        <button class="btn btn--ghost btn--sm" id="btn-find-similar">
+          🔗 Find similar
+        </button>
+        <button class="btn btn--primary btn--sm" id="btn-new-analysis">
+          + New analysis
+        </button>
+      </div>
+
+    </div><!-- /result-mode -->
+
+  </section>
+
+  <!-- ── Tab 2: History ────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-history">
+
+    <div class="tab-panel__header">
+      <h2 class="tab-panel__title">Your history</h2>
     </div>
 
-    <script src="popup.js"></script>
-  </body>
+    <div id="history-list" class="news-list">
+      <!-- Injected by JS -->
+    </div>
+
+    <div class="pagination hidden" id="history-pagination">
+      <button class="btn btn--ghost btn--sm" id="history-prev">← Prev</button>
+      <span id="history-page-info"></span>
+      <button class="btn btn--ghost btn--sm" id="history-next">Next →</button>
+    </div>
+
+    <div class="empty-state hidden" id="history-empty">
+      <span>📭</span>
+      <p>You haven't analyzed any news yet.</p>
+    </div>
+
+  </section>
+
+  <!-- ── Tab 3: Similar ─────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-similar">
+
+    <div class="tab-panel__header">
+      <h2 class="tab-panel__title">Similar news</h2>
+      <p class="tab-panel__subtitle" id="similar-query-title"></p>
+    </div>
+
+    <div id="similar-list" class="news-list">
+      <!-- Injected by JS -->
+    </div>
+
+    <div class="empty-state hidden" id="similar-empty">
+      <span>🔍</span>
+      <p>No similar news items were found in our system.</p>
+    </div>
+
+    <div class="empty-state hidden" id="similar-no-title">
+      <span>⚠️</span>
+      <p>Analyze a news article first to find similar ones.</p>
+    </div>
+
+  </section>
+
+  <!-- ── Tab 4: Sources ─────────────────────────────────────────────── -->
+  <section class="tab-panel" id="tab-sources">
+
+    <div class="tab-panel__header">
+      <h2 class="tab-panel__title">Most reliable sources</h2>
+      <p class="tab-panel__subtitle">Based on your prediction history</p>
+    </div>
+
+    <div class="podium" id="podium">
+      <!-- Injected by JS -->
+    </div>
+
+    <div class="empty-state hidden" id="sources-empty">
+      <span>📊</span>
+      <p>Analyze news from different sources to see your reliability ranking.</p>
+    </div>
+
+  </section>
+
+  <script src="popup.js"></script>
+</body>
 </html>

@@ -1,29 +1,45 @@
 {
   "manifest_version": 3,
   "name": "BuloCheck",
-  "version": "1.0",
-  "description": "Detect fake news using AI classification",
+  "version": "1.0.0",
+  "description": "Detect fake news in real time. Analyze any article directly from your browser.",
 
-  "permissions": ["activeTab", "scripting", "storage", "contextMenus"],
-
-  "host_permissions": [
-    "<all_urls>",
-    "http://127.0.0.1:8000/*"
-  ],
-
-  "background": {
-    "service_worker": "background.js"
+  "icons": {
+    "16":  "icons/icon16.png",
+    "48":  "icons/icon48.png",
+    "128": "icons/icon128.png"
   },
 
   "action": {
     "default_popup": "popup.html",
-    "default_title": "BuloCheck"
+    "default_icon": {
+      "16":  "icons/icon16.png",
+      "48":  "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "BuloCheck — Fake News Detector"
   },
+
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting",
+    "tabs"
+  ],
+
+  "host_permissions": [
+    "http://127.0.0.1:8000/*"
+  ],
 
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle"
     }
-  ]
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  }
 }
