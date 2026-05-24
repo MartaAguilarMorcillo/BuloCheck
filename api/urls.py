@@ -1,6 +1,12 @@
 from django.urls import path
 
-from .views import HistoryView, PredictView, SimilarNewsView, SourceLookupView, SourceStatsView
+from .views import (
+    HistoryView,
+    PredictView,
+    SimilarNewsView,
+    SourceLookupView,
+    SourceStatsView,
+)
 
 urlpatterns = [
     path("predict/", PredictView.as_view(), name="predict"),

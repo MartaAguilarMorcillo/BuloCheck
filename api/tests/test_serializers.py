@@ -117,7 +117,15 @@ class NewsCheckSerializerTest(TestCase):
     def test_serializes_correct_fields(self):
         s = NewsCheckSerializer(self.check)
         data = s.data
-        for field in ["id", "title", "text", "news_source", "label", "confidence", "created_at"]:
+        for field in [
+            "id",
+            "title",
+            "text",
+            "news_source",
+            "label",
+            "confidence",
+            "created_at",
+        ]:
             self.assertIn(field, data)
 
     def test_does_not_expose_user_id(self):

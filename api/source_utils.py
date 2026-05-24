@@ -21,7 +21,6 @@ import re
 
 from .models import NewsSource
 
-
 GOOGLE_FAVICON_URL = "https://www.google.com/s2/favicons?domain={domain}&sz=128"
 
 
@@ -58,7 +57,7 @@ def get_or_create_source(domain: str) -> NewsSource:
     source, _ = NewsSource.objects.get_or_create(
         domain=domain,
         defaults={
-            "name": None,           # ← unknown, frontend shows domain instead
+            "name": None,  # ← unknown, frontend shows domain instead
             "logo_url": _get_favicon_url(domain),
             "is_predefined": False,
         },

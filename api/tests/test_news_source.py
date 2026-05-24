@@ -10,7 +10,7 @@ Covers:
   - GET /api/sources/ returns NewsSource objects with logo
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 from rest_framework import status
@@ -38,6 +38,7 @@ MOCK_PREDICTION = {
 # 1. NewsSource model tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class NewsSourceModelTest(TestCase):
 
     def test_create_predefined_source(self):
@@ -49,18 +50,22 @@ class NewsSourceModelTest(TestCase):
 
     def test_logo_url_is_optional(self):
         """NewsSource can be created without a logo URL."""
-        source = NewsSource.objects.create(name="Unknown Source", domain="unknown-test.com")
+        source = NewsSource.objects.create(
+            name="Unknown Source", domain="unknown-test.com"
+        )
         self.assertIsNone(source.logo_url)
 
     def test_domain_is_unique(self):
         """Two sources cannot share the same domain."""
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             NewsSource.objects.create(name="BBC Copy", domain="bbc.com")
 
     def test_name_is_unique(self):
         """Two sources cannot share the same name."""
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             NewsSource.objects.create(name="BBC", domain="bbc-copy.com")
 
@@ -72,7 +77,9 @@ class NewsSourceModelTest(TestCase):
 
     def test_is_predefined_defaults_to_false(self):
         """is_predefined defaults to False for new sources."""
-        source = NewsSource.objects.create(name="New Source Test", domain="newsourcetest.com")
+        source = NewsSource.objects.create(
+            name="New Source Test", domain="newsourcetest.com"
+        )
         self.assertFalse(source.is_predefined)
 
     def test_predefined_sources_loaded_by_migration(self):
@@ -105,7 +112,7 @@ class GetOrCreateSourceTest(TestCase):
         source = get_or_create_source("bbc.com")
         self.assertEqual(source.name, "BBC")
         self.assertTrue(source.is_predefined)
-    
+
     def test_new_source_name_is_none(self):
         """New source name is None — frontend shows domain instead."""
         source = get_or_create_source("unknownnewssite.com")
@@ -138,6 +145,7 @@ class GetOrCreateSourceTest(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. SourceLookupView tests — GET /api/sources/lookup/
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class SourceLookupViewTest(APITestCase):
 
@@ -173,17 +181,22 @@ class SourceLookupViewTest(APITestCase):
 # 4. PredictView with domain — source resolved and returned
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class PredictWithSourceTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_predict_with_known_domain_returns_source(self, _):
         """POST /api/predict/ with known domain returns full source object."""
-        response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-            "device_id": DEVICE_ID,
-        }, format="json")
+        response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
@@ -195,11 +208,15 @@ class PredictWithSourceTest(APITestCase):
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_predict_without_domain_returns_null_source(self, _):
         """POST /api/predict/ without domain returns null news_source."""
-        response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "device_id": DEVICE_ID,
-        }, format="json")
+        response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.json()["news_source"])
@@ -215,12 +232,16 @@ class PredictWithSourceTest(APITestCase):
         )
         mock_get_source.return_value = new_source
 
-        response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "unknownnews.com",
-            "device_id": DEVICE_ID,
-        }, format="json")
+        response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "unknownnews.com",
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         mock_get_source.assert_called_once_with("unknownnews.com")
@@ -228,12 +249,16 @@ class PredictWithSourceTest(APITestCase):
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_predict_saves_news_source_fk_in_db(self, _):
         """POST /api/predict/ saves the news_source FK in the NewsCheck record."""
-        self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-            "device_id": DEVICE_ID,
-        }, format="json")
+        self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
 
         check = NewsCheck.objects.first()
         self.assertIsNotNone(check.news_source)
@@ -243,6 +268,7 @@ class PredictWithSourceTest(APITestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. SourceStatsView with NewsSource objects
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class SourceStatsWithNewsSourceTest(APITestCase):
 

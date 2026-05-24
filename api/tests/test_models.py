@@ -2,10 +2,11 @@
 test_models.py — Model tests for AnonymousUser and NewsCheck.
 """
 
+from datetime import timedelta
+
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
-from datetime import timedelta
 
 from api.models import AnonymousUser, NewsCheck
 
@@ -18,11 +19,21 @@ def make_user(device_id=DEVICE_ID):
     return AnonymousUser.objects.create(id=device_id)
 
 
-def make_check(user, label="REAL", confidence=0.75, news_source=None,
-               title=SAMPLE_TITLE, text=SAMPLE_TEXT):
+def make_check(
+    user,
+    label="REAL",
+    confidence=0.75,
+    news_source=None,
+    title=SAMPLE_TITLE,
+    text=SAMPLE_TEXT,
+):
     return NewsCheck.objects.create(
-        user=user, title=title, text=text,
-        news_source=news_source, label=label, confidence=confidence,
+        user=user,
+        title=title,
+        text=text,
+        news_source=news_source,
+        label=label,
+        confidence=confidence,
     )
 
 
@@ -71,11 +82,13 @@ class NewsCheckModelTest(TestCase):
         self.assertEqual(check.label, "REAL")
         self.assertAlmostEqual(check.confidence, 0.75)
 
-
     def test_source_is_optional(self):
         check = NewsCheck.objects.create(
-            user=self.user, title=SAMPLE_TITLE, text=SAMPLE_TEXT,
-            label="FAKE", confidence=0.9,
+            user=self.user,
+            title=SAMPLE_TITLE,
+            text=SAMPLE_TEXT,
+            label="FAKE",
+            confidence=0.9,
         )
         self.assertIsNone(check.news_source)
 

@@ -5,7 +5,11 @@ from rest_framework.views import APIView
 
 from .ml import predict_news
 from .models import AnonymousUser, NewsCheck, NewsSource
-from .serializers import NewsCheckSerializer, NewsSourceSerializer, PredictRequestSerializer
+from .serializers import (
+    NewsCheckSerializer,
+    NewsSourceSerializer,
+    PredictRequestSerializer,
+)
 from .source_utils import get_or_create_source
 from .validators import validate_body, validate_title
 
@@ -81,7 +85,9 @@ class PredictView(APIView):
             error_msg = str(e)
             if "timed out" in error_msg.lower():
                 return Response(
-                    {"error": "The model is waking up, please try again in 30 seconds."},
+                    {
+                        "error": "The model is waking up, please try again in 30 seconds."
+                    },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
             return Response(
@@ -105,7 +111,9 @@ class PredictView(APIView):
             "confidence": result["confidence"],
             "probas": result["probas"],
             "check_id": check.id,
-            "news_source": NewsSourceSerializer(news_source).data if news_source else None,
+            "news_source": (
+                NewsSourceSerializer(news_source).data if news_source else None
+            ),
         }
         if warnings:
             response_data["warnings"] = warnings
@@ -180,12 +188,14 @@ class HistoryView(APIView):
 
         serializer = NewsCheckSerializer(page_checks, many=True)
 
-        return Response({
-            "count": total,
-            "total_pages": total_pages,
-            "current_page": page,
-            "results": serializer.data,
-        })
+        return Response(
+            {
+                "count": total,
+                "total_pages": total_pages,
+                "current_page": page,
+                "results": serializer.data,
+            }
+        )
 
 
 class SourceStatsView(APIView):
@@ -234,9 +244,9 @@ class SourceStatsView(APIView):
         except AnonymousUser.DoesNotExist:
             return Response([], status=status.HTTP_200_OK)
 
-        checks = user.checks.filter(
-            news_source__isnull=False
-        ).select_related("news_source")
+        checks = user.checks.filter(news_source__isnull=False).select_related(
+            "news_source"
+        )
 
         if not checks.exists():
             return Response([], status=status.HTTP_200_OK)
@@ -271,14 +281,16 @@ class SourceStatsView(APIView):
                 else 0.0
             )
 
-            result.append({
-                "news_source": NewsSourceSerializer(src_data["news_source"]).data,
-                "total": total,
-                "real": real_count,
-                "fake": src_data["fake"],
-                "real_confidence_avg": real_confidence_avg,
-                "reliability_pct": round(real_count / total * 100, 1),
-            })
+            result.append(
+                {
+                    "news_source": NewsSourceSerializer(src_data["news_source"]).data,
+                    "total": total,
+                    "real": real_count,
+                    "fake": src_data["fake"],
+                    "real_confidence_avg": real_confidence_avg,
+                    "reliability_pct": round(real_count / total * 100, 1),
+                }
+            )
 
         result.sort(
             key=lambda x: (x["real"], x["real_confidence_avg"]),
@@ -419,16 +431,20 @@ class SimilarNewsView(APIView):
                 LIMIT 5
                 """,
                 [
-                    title,            # trgm_sim SELECT
-                    title,            # fts_rank SELECT
-                    title, min_sim,   # CASE trigram+fulltext
-                    title,            # CASE fts check
-                    title, min_sim,   # CASE trigram only
-                    title,            # WHERE exclude exact match
-                    title, min_sim,   # WHERE trgm condition
-                    title, min_sim,   # WHERE fts condition
-                    title,            # ORDER BY trgm
-                    title,            # ORDER BY fts
+                    title,  # trgm_sim SELECT
+                    title,  # fts_rank SELECT
+                    title,
+                    min_sim,  # CASE trigram+fulltext
+                    title,  # CASE fts check
+                    title,
+                    min_sim,  # CASE trigram only
+                    title,  # WHERE exclude exact match
+                    title,
+                    min_sim,  # WHERE trgm condition
+                    title,
+                    min_sim,  # WHERE fts condition
+                    title,  # ORDER BY trgm
+                    title,  # ORDER BY fts
                 ],
             )
             rows = cursor.fetchall()

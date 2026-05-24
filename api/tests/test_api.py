@@ -34,8 +34,14 @@ def make_user(device_id=DEVICE_ID):
     return AnonymousUser.objects.create(id=device_id)
 
 
-def make_check(user, label="REAL", confidence=0.75, news_source=None,
-               title=SAMPLE_TITLE, text=SAMPLE_TEXT):
+def make_check(
+    user,
+    label="REAL",
+    confidence=0.75,
+    news_source=None,
+    title=SAMPLE_TITLE,
+    text=SAMPLE_TEXT,
+):
     return NewsCheck.objects.create(
         user=user,
         title=title,
@@ -88,12 +94,14 @@ class PredictViewTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_predict_creates_news_check_in_db(self, _):
-        self._post({
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-            "device_id": DEVICE_ID,
-        })
+        self._post(
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+                "device_id": DEVICE_ID,
+            }
+        )
         self.assertEqual(NewsCheck.objects.count(), 1)
         check = NewsCheck.objects.first()
         self.assertEqual(check.label, "FAKE")
@@ -166,11 +174,13 @@ class PredictViewTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_predict_without_source_saves_null(self, _):
-        self._post({
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "device_id": DEVICE_ID,
-        })
+        self._post(
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "device_id": DEVICE_ID,
+            }
+        )
         self.assertIsNone(NewsCheck.objects.first().news_source)
 
 
@@ -255,7 +265,15 @@ class HistoryViewTest(APITestCase):
     def test_history_result_item_fields(self):
         make_check(self.user)
         item = self._get().json()["results"][0]
-        for field in ["id", "title", "text", "news_source", "label", "confidence", "created_at"]:
+        for field in [
+            "id",
+            "title",
+            "text",
+            "news_source",
+            "label",
+            "confidence",
+            "created_at",
+        ]:
             self.assertIn(field, item)
 
     def test_history_pagination(self):
@@ -316,8 +334,14 @@ class SourceStatsViewTest(APITestCase):
         self.assertEqual(data[1]["news_source"]["domain"], "bbc.com")
 
     def test_sources_returns_max_5(self):
-        domains = ["bbc.com", "nytimes.com", "foxnews.com",
-                   "cnn.com", "theguardian.com", "reuters.com"]
+        domains = [
+            "bbc.com",
+            "nytimes.com",
+            "foxnews.com",
+            "cnn.com",
+            "theguardian.com",
+            "reuters.com",
+        ]
         for domain in domains:
             src = NewsSource.objects.get(domain=domain)
             make_check(self.user, news_source=src, label="REAL")
@@ -326,8 +350,14 @@ class SourceStatsViewTest(APITestCase):
     def test_sources_response_fields(self):
         make_check(self.user, news_source=self.bbc, label="REAL", confidence=0.80)
         item = self._get().json()[0]
-        for field in ["news_source", "total", "real", "fake",
-                      "real_confidence_avg", "reliability_pct"]:
+        for field in [
+            "news_source",
+            "total",
+            "real",
+            "fake",
+            "real_confidence_avg",
+            "reliability_pct",
+        ]:
             self.assertIn(field, item)
         for field in ["id", "name", "domain", "logo_url", "is_predefined"]:
             self.assertIn(field, item["news_source"])

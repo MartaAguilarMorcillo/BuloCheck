@@ -31,12 +31,16 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_predict_then_history(self, _):
-        predict_response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-            "device_id": DEVICE_ID,
-        }, format="json")
+        predict_response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
 
         self.assertEqual(predict_response.status_code, status.HTTP_200_OK)
         self.assertEqual(predict_response.json()["label"], "FAKE")
@@ -54,20 +58,28 @@ class FullFlowIntegrationTest(APITestCase):
     def test_predict_then_sources_ranking(self, mock_predict):
         mock_predict.return_value = MOCK_PREDICTION_REAL
         for _ in range(2):
-            self.client.post("/api/predict/", {
-                "title": SAMPLE_TITLE,
-                "text": SAMPLE_TEXT,
-                "domain": "nytimes.com",
-                "device_id": DEVICE_ID,
-            }, format="json")
+            self.client.post(
+                "/api/predict/",
+                {
+                    "title": SAMPLE_TITLE,
+                    "text": SAMPLE_TEXT,
+                    "domain": "nytimes.com",
+                    "device_id": DEVICE_ID,
+                },
+                format="json",
+            )
 
         mock_predict.return_value = MOCK_PREDICTION_FAKE
-        self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "foxnews.com",
-            "device_id": DEVICE_ID,
-        }, format="json")
+        self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "foxnews.com",
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
 
         sources_response = self.client.get("/api/sources/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(sources_response.status_code, status.HTTP_200_OK)
