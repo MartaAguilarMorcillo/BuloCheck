@@ -10,7 +10,7 @@ Covers:
   - GET /api/sources/ returns NewsSource objects with logo
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.test import TestCase
 from rest_framework import status

@@ -17,8 +17,6 @@ Google Favicon Service:
   - sz parameter: 16, 32, 64 or 128 (pixels)
 """
 
-import re
-
 from .models import NewsSource
 
 GOOGLE_FAVICON_URL = "https://www.google.com/s2/favicons?domain={domain}&sz=128"
