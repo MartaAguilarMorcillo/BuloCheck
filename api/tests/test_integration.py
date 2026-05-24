@@ -31,16 +31,12 @@ class FullFlowIntegrationTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_predict_then_history(self, _):
-        predict_response = self.client.post(
-            "/api/predict/",
-            {
-                "title": SAMPLE_TITLE,
-                "text": SAMPLE_TEXT,
-                "source": "bbc.com",
-                "device_id": DEVICE_ID,
-            },
-            format="json",
-        )
+        predict_response = self.client.post("/api/predict/", {
+            "title": SAMPLE_TITLE,
+            "text": SAMPLE_TEXT,
+            "domain": "bbc.com",
+            "device_id": DEVICE_ID,
+        }, format="json")
 
         self.assertEqual(predict_response.status_code, status.HTTP_200_OK)
         self.assertEqual(predict_response.json()["label"], "FAKE")
@@ -48,44 +44,36 @@ class FullFlowIntegrationTest(APITestCase):
         history_response = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(history_response.status_code, status.HTTP_200_OK)
 
-        history = history_response.json()["results"]  # ← corregido
+        history = history_response.json()["results"]
         self.assertEqual(len(history), 1)
         self.assertEqual(history[0]["title"], SAMPLE_TITLE)
         self.assertEqual(history[0]["label"], "FAKE")
-        self.assertEqual(history[0]["source"], "bbc.com")
+        self.assertEqual(history[0]["news_source"]["domain"], "bbc.com")
 
     @patch("api.views.predict_news")
     def test_predict_then_sources_ranking(self, mock_predict):
         mock_predict.return_value = MOCK_PREDICTION_REAL
         for _ in range(2):
-            self.client.post(
-                "/api/predict/",
-                {
-                    "title": SAMPLE_TITLE,
-                    "text": SAMPLE_TEXT,
-                    "source": "nytimes.com",
-                    "device_id": DEVICE_ID,
-                },
-                format="json",
-            )
-
-        mock_predict.return_value = MOCK_PREDICTION_FAKE
-        self.client.post(
-            "/api/predict/",
-            {
+            self.client.post("/api/predict/", {
                 "title": SAMPLE_TITLE,
                 "text": SAMPLE_TEXT,
-                "source": "foxnews.com",
+                "domain": "nytimes.com",
                 "device_id": DEVICE_ID,
-            },
-            format="json",
-        )
+            }, format="json")
+
+        mock_predict.return_value = MOCK_PREDICTION_FAKE
+        self.client.post("/api/predict/", {
+            "title": SAMPLE_TITLE,
+            "text": SAMPLE_TEXT,
+            "domain": "foxnews.com",
+            "device_id": DEVICE_ID,
+        }, format="json")
 
         sources_response = self.client.get("/api/sources/", HTTP_X_DEVICE_ID=DEVICE_ID)
         self.assertEqual(sources_response.status_code, status.HTTP_200_OK)
         data = sources_response.json()
-        self.assertEqual(data[0]["source"], "nytimes.com")
-        self.assertEqual(data[1]["source"], "foxnews.com")
+        self.assertEqual(data[0]["news_source"]["domain"], "nytimes.com")
+        self.assertEqual(data[1]["news_source"]["domain"], "foxnews.com")
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
     def test_multiple_users_data_isolation(self, _):

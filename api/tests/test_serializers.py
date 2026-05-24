@@ -4,7 +4,7 @@ test_serializers.py — Tests for PredictRequestSerializer and NewsCheckSerializ
 
 from django.test import TestCase
 
-from api.models import AnonymousUser, NewsCheck
+from api.models import AnonymousUser, NewsCheck, NewsSource
 from api.serializers import NewsCheckSerializer, PredictRequestSerializer
 
 DEVICE_ID = "550e8400-e29b-41d4-a716-446655440000"
@@ -104,26 +104,21 @@ class NewsCheckSerializerTest(TestCase):
 
     def setUp(self):
         self.user = AnonymousUser.objects.create(id=DEVICE_ID)
+        self.bbc = NewsSource.objects.get(domain="bbc.com")
         self.check = NewsCheck.objects.create(
             user=self.user,
             title=SAMPLE_TITLE,
             text=SAMPLE_TEXT,
-            source="bbc.com",
+            news_source=self.bbc,
             label="REAL",
             confidence=0.75,
         )
 
     def test_serializes_correct_fields(self):
-        """Serializer includes all expected fields."""
         s = NewsCheckSerializer(self.check)
         data = s.data
-        self.assertIn("id", data)
-        self.assertIn("title", data)
-        self.assertIn("text", data)
-        self.assertIn("source", data)
-        self.assertIn("label", data)
-        self.assertIn("confidence", data)
-        self.assertIn("created_at", data)
+        for field in ["id", "title", "text", "news_source", "label", "confidence", "created_at"]:
+            self.assertIn(field, data)
 
     def test_does_not_expose_user_id(self):
         """Serializer does not expose user or user_id."""
@@ -142,6 +137,7 @@ class NewsCheckSerializerTest(TestCase):
         self.assertAlmostEqual(float(s.data["confidence"]), 0.75)
 
     def test_source_value(self):
-        """Serializer returns correct source value."""
+        """Serializer returns correct news_source object."""
         s = NewsCheckSerializer(self.check)
-        self.assertEqual(s.data["source"], "bbc.com")
+        self.assertEqual(s.data["news_source"]["domain"], "bbc.com")
+        self.assertEqual(s.data["news_source"]["name"], "BBC")
