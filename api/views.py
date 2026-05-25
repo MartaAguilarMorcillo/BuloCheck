@@ -89,16 +89,21 @@ class PredictView(APIView):
                 "label": existing_check.label,
                 "confidence": existing_check.confidence,
                 "probas": {
-                    "REAL": round(1 - existing_check.confidence, 4)
+                    "REAL": (
+                        round(1 - existing_check.confidence, 4)
                         if existing_check.label == "FAKE"
-                        else round(existing_check.confidence, 4),
-                    "FAKE": round(existing_check.confidence, 4)
+                        else round(existing_check.confidence, 4)
+                    ),
+                    "FAKE": (
+                        round(existing_check.confidence, 4)
                         if existing_check.label == "FAKE"
-                        else round(1 - existing_check.confidence, 4),
+                        else round(1 - existing_check.confidence, 4)
+                    ),
                 },
                 "check_id": existing_check.id,
-                "news_source": NewsSourceSerializer(news_source).data
-                    if news_source else None,
+                "news_source": (
+                    NewsSourceSerializer(news_source).data if news_source else None
+                ),
                 "from_cache": True,  # informs the frontend this is a cached result
             }
             if warnings:
@@ -112,7 +117,9 @@ class PredictView(APIView):
             error_msg = str(e)
             if "timed out" in error_msg.lower():
                 return Response(
-                    {"error": "The model is waking up, please try again in 30 seconds."},
+                    {
+                        "error": "The model is waking up, please try again in 30 seconds."
+                    },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
             return Response(
@@ -135,7 +142,9 @@ class PredictView(APIView):
             "confidence": result["confidence"],
             "probas": result["probas"],
             "check_id": check.id,
-            "news_source": NewsSourceSerializer(news_source).data if news_source else None,
+            "news_source": (
+                NewsSourceSerializer(news_source).data if news_source else None
+            ),
             "from_cache": False,
         }
         if warnings:

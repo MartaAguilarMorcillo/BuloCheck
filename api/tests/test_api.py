@@ -563,12 +563,24 @@ class NewsCheckDeduplicationTest(APITestCase):
     def test_two_users_same_article_one_db_record(self, _):
         """Two different users predicting the same article share one NewsCheck."""
         device_id_2 = str(uuid.uuid4())
-        self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": DEVICE_ID,
-        }, format="json")
-        self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": device_id_2,
-        }, format="json")
+        self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "device_id": DEVICE_ID,
+            },
+            format="json",
+        )
+        self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "device_id": device_id_2,
+            },
+            format="json",
+        )
         self.assertEqual(NewsCheck.objects.count(), 1)
         check = NewsCheck.objects.first()
         self.assertEqual(check.users.count(), 2)
@@ -577,7 +589,9 @@ class NewsCheckDeduplicationTest(APITestCase):
     def test_model_not_called_for_cached_article(self, mock_predict):
         """Model is not called when article already exists in DB."""
         payload = {
-            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": DEVICE_ID,
+            "title": SAMPLE_TITLE,
+            "text": SAMPLE_TEXT,
+            "device_id": DEVICE_ID,
         }
         self.client.post("/api/predict/", payload, format="json")
         self.client.post("/api/predict/", payload, format="json")
@@ -587,11 +601,13 @@ class NewsCheckDeduplicationTest(APITestCase):
     def test_same_user_appears_once_in_history(self, _):
         """Same article predicted twice by same user appears once in history."""
         payload = {
-            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": DEVICE_ID,
+            "title": SAMPLE_TITLE,
+            "text": SAMPLE_TEXT,
+            "device_id": DEVICE_ID,
         }
         self.client.post("/api/predict/", payload, format="json")
         self.client.post("/api/predict/", payload, format="json")
-        history = self.client.get(
-            "/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID
-        ).json()["results"]
+        history = self.client.get("/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID).json()[
+            "results"
+        ]
         self.assertEqual(len(history), 1)

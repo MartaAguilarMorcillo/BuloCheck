@@ -1,6 +1,7 @@
 """
 test_models.py — Model tests for AnonymousUser and NewsCheck.
 """
+
 import uuid
 from datetime import timedelta
 
