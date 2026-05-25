@@ -60,25 +60,57 @@ class PredictView(APIView):
         # 2. Validate content
         title_validation = validate_title(title)
         body_validation = validate_body(text)
-
         errors = title_validation.errors + body_validation.errors
         if errors:
             return Response(
                 {"validation_errors": errors},
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
-
         warnings = title_validation.warnings + body_validation.warnings
 
         # 3. Get or create anonymous user
         user, _ = AnonymousUser.objects.get_or_create(id=data["device_id"])
 
-        # 4. Resolve news source from domain (if provided)
-        news_source = None
-        if domain:
-            news_source = get_or_create_source(domain)
+        # 4. Resolve news source
+        news_source = get_or_create_source(domain) if domain else None
 
-        # 5. Call the model
+        # 5. Check if this exact news article already exists in the DB
+        existing_check = NewsCheck.objects.filter(
+            title=title,
+            text=text,
+            news_source=news_source,
+        ).first()
+
+        if existing_check:
+            # Article already predicted — just link user if not already linked
+            existing_check.users.add(user)
+
+            response_data = {
+                "label": existing_check.label,
+                "confidence": existing_check.confidence,
+                "probas": {
+                    "REAL": (
+                        round(1 - existing_check.confidence, 4)
+                        if existing_check.label == "FAKE"
+                        else round(existing_check.confidence, 4)
+                    ),
+                    "FAKE": (
+                        round(existing_check.confidence, 4)
+                        if existing_check.label == "FAKE"
+                        else round(1 - existing_check.confidence, 4)
+                    ),
+                },
+                "check_id": existing_check.id,
+                "news_source": (
+                    NewsSourceSerializer(news_source).data if news_source else None
+                ),
+                "from_cache": True,  # informs the frontend this is a cached result
+            }
+            if warnings:
+                response_data["warnings"] = warnings
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        # 6. New article — call the model
         try:
             result = predict_news(title=title, text=text)
         except Exception as e:
@@ -95,17 +127,16 @@ class PredictView(APIView):
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        # 6. Save to database
+        # 7. Save new NewsCheck and link user
         check = NewsCheck.objects.create(
-            user=user,
             title=title,
             text=text,
             news_source=news_source,
             label=result["label"],
             confidence=result["confidence"],
         )
+        check.users.add(user)
 
-        # 7. Return result
         response_data = {
             "label": result["label"],
             "confidence": result["confidence"],
@@ -114,6 +145,7 @@ class PredictView(APIView):
             "news_source": (
                 NewsSourceSerializer(news_source).data if news_source else None
             ),
+            "from_cache": False,
         }
         if warnings:
             response_data["warnings"] = warnings

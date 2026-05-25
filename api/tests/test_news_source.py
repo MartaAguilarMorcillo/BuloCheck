@@ -278,14 +278,15 @@ class SourceStatsWithNewsSourceTest(APITestCase):
         self.nyt = NewsSource.objects.get(domain="nytimes.com")
 
     def _make_check(self, source, label, confidence=0.80):
-        return NewsCheck.objects.create(
-            user=self.user,
+        check = NewsCheck.objects.create(
             title=SAMPLE_TITLE,
             text=SAMPLE_TEXT,
             news_source=source,
             label=label,
             confidence=confidence,
         )
+        check.users.add(self.user)
+        return check
 
     def test_sources_response_includes_news_source_object(self):
         """GET /api/sources/ returns full news_source object for each entry."""

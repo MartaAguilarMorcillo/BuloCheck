@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("api", "0004_news_source"),
+        ("api", "0003_news_sources"),
     ]
 
     operations = [

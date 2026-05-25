@@ -55,10 +55,10 @@ class NewsCheck(models.Model):
         ("FAKE", "Fake"),
     ]
 
-    user = models.ForeignKey(
+    users = models.ManyToManyField(
         AnonymousUser,
-        on_delete=models.CASCADE,
         related_name="checks",
+        db_table="news_check_users",
     )
     title = models.TextField()
     text = models.TextField()
