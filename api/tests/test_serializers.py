@@ -106,13 +106,13 @@ class NewsCheckSerializerTest(TestCase):
         self.user = AnonymousUser.objects.create(id=DEVICE_ID)
         self.bbc = NewsSource.objects.get(domain="bbc.com")
         self.check = NewsCheck.objects.create(
-            user=self.user,
             title=SAMPLE_TITLE,
             text=SAMPLE_TEXT,
             news_source=self.bbc,
             label="REAL",
             confidence=0.75,
         )
+        self.check.users.add(self.user)
 
     def test_serializes_correct_fields(self):
         s = NewsCheckSerializer(self.check)

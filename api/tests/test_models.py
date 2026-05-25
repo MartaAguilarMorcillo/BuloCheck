@@ -1,7 +1,7 @@
 """
 test_models.py — Model tests for AnonymousUser and NewsCheck.
 """
-
+import uuid
 from datetime import timedelta
 
 from django.db import IntegrityError
@@ -27,14 +27,15 @@ def make_check(
     title=SAMPLE_TITLE,
     text=SAMPLE_TEXT,
 ):
-    return NewsCheck.objects.create(
-        user=user,
+    check = NewsCheck.objects.create(
         title=title,
         text=text,
         news_source=news_source,
         label=label,
         confidence=confidence,
     )
+    check.users.add(user)
+    return check
 
 
 class AnonymousUserModelTest(TestCase):
@@ -84,12 +85,12 @@ class NewsCheckModelTest(TestCase):
 
     def test_source_is_optional(self):
         check = NewsCheck.objects.create(
-            user=self.user,
             title=SAMPLE_TITLE,
             text=SAMPLE_TEXT,
             label="FAKE",
             confidence=0.9,
         )
+        check.users.add(self.user)
         self.assertIsNone(check.news_source)
 
     def test_label_real(self):
@@ -122,12 +123,15 @@ class NewsCheckModelTest(TestCase):
         self.assertEqual(checks[1].title, "First news")
 
     def test_cascade_delete(self):
-        """Deleting a user deletes all their NewsChecks."""
+        """Deleting a user removes the relationship but not the NewsCheck."""
         make_check(self.user)
         make_check(self.user)
         self.assertEqual(NewsCheck.objects.count(), 2)
         self.user.delete()
-        self.assertEqual(NewsCheck.objects.count(), 0)
+        # NewsChecks still exist but are no longer linked to the deleted user
+        self.assertEqual(NewsCheck.objects.count(), 2)
+        for check in NewsCheck.objects.all():
+            self.assertEqual(check.users.count(), 0)
 
     def test_db_table_name(self):
         """Model uses the correct DB table name."""
@@ -136,7 +140,8 @@ class NewsCheckModelTest(TestCase):
     def test_user_relation(self):
         """NewsCheck is linked to the correct AnonymousUser."""
         check = make_check(self.user)
-        self.assertEqual(check.user, self.user)
+        user_ids = check.users.values_list("id", flat=True)
+        self.assertIn(uuid.UUID(str(self.user.id)), user_ids)
 
     def test_related_name_checks(self):
         """AnonymousUser.checks returns all related NewsChecks."""

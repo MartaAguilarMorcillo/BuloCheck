@@ -7,8 +7,7 @@ New sources discovered at prediction time are created on the fly with
 is_predefined=False and no logo (resolved later via Clearbit API).
 """
 
-import django.db.models.deletion
-from django.db import migrations, models
+from django.db import migrations
 
 PREDEFINED_SOURCES = [
     (
@@ -260,35 +259,9 @@ def unload_predefined_sources(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("api", "0003_news_check_fts_index"),
+        ("api", "0002_trgm_and_fts_indexes"),
     ]
 
     operations = [
-        # 1. Create NewsSource table
-        migrations.CreateModel(
-            name="NewsSource",
-            fields=[
-                ("id", models.AutoField(primary_key=True)),
-                ("name", models.CharField(max_length=200, unique=True)),
-                ("domain", models.CharField(max_length=200, unique=True)),
-                ("logo_url", models.URLField(max_length=500, null=True, blank=True)),
-                ("is_predefined", models.BooleanField(default=False)),
-                ("created_at", models.DateTimeField(auto_now_add=True)),
-            ],
-            options={"db_table": "news_sources", "ordering": ["name"]},
-        ),
-        # 2. Add news_source FK to NewsCheck (nullable — old records have no source)
-        migrations.AddField(
-            model_name="newscheck",
-            name="news_source",
-            field=models.ForeignKey(
-                to="api.NewsSource",
-                on_delete=django.db.models.deletion.SET_NULL,
-                null=True,
-                blank=True,
-                related_name="checks",
-            ),
-        ),
-        # 3. Load the 47 predefined sources
         migrations.RunPython(load_predefined_sources, unload_predefined_sources),
     ]

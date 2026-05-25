@@ -42,14 +42,15 @@ def make_check(
     title=SAMPLE_TITLE,
     text=SAMPLE_TEXT,
 ):
-    return NewsCheck.objects.create(
-        user=user,
+    check = NewsCheck.objects.create(
         title=title,
         text=text,
         news_source=news_source,
         label=label,
         confidence=confidence,
     )
+    check.users.add(user)
+    return check
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -524,3 +525,73 @@ class SimilarNewsViewTest(APITestCase):
         self.assertNotIn(
             "Facebook Continues To Host Militant Groups Despite Ban", titles
         )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /api/predict/
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class NewsCheckDeduplicationTest(APITestCase):
+    """Tests for the deduplication logic in PredictView."""
+
+    @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
+    def test_same_article_not_saved_twice(self, _):
+        """Predicting the same article twice creates only one NewsCheck."""
+        payload = {
+            "title": SAMPLE_TITLE,
+            "text": SAMPLE_TEXT,
+            "device_id": DEVICE_ID,
+        }
+        self.client.post("/api/predict/", payload, format="json")
+        self.client.post("/api/predict/", payload, format="json")
+        self.assertEqual(NewsCheck.objects.count(), 1)
+
+    @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
+    def test_second_prediction_returns_from_cache(self, _):
+        """Second prediction of same article returns from_cache: true."""
+        payload = {
+            "title": SAMPLE_TITLE,
+            "text": SAMPLE_TEXT,
+            "device_id": DEVICE_ID,
+        }
+        self.client.post("/api/predict/", payload, format="json")
+        response = self.client.post("/api/predict/", payload, format="json")
+        self.assertTrue(response.json()["from_cache"])
+
+    @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
+    def test_two_users_same_article_one_db_record(self, _):
+        """Two different users predicting the same article share one NewsCheck."""
+        device_id_2 = str(uuid.uuid4())
+        self.client.post("/api/predict/", {
+            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": DEVICE_ID,
+        }, format="json")
+        self.client.post("/api/predict/", {
+            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": device_id_2,
+        }, format="json")
+        self.assertEqual(NewsCheck.objects.count(), 1)
+        check = NewsCheck.objects.first()
+        self.assertEqual(check.users.count(), 2)
+
+    @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
+    def test_model_not_called_for_cached_article(self, mock_predict):
+        """Model is not called when article already exists in DB."""
+        payload = {
+            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": DEVICE_ID,
+        }
+        self.client.post("/api/predict/", payload, format="json")
+        self.client.post("/api/predict/", payload, format="json")
+        mock_predict.assert_called_once()  # called only on first prediction
+
+    @patch("api.views.predict_news", return_value=MOCK_PREDICTION_FAKE)
+    def test_same_user_appears_once_in_history(self, _):
+        """Same article predicted twice by same user appears once in history."""
+        payload = {
+            "title": SAMPLE_TITLE, "text": SAMPLE_TEXT, "device_id": DEVICE_ID,
+        }
+        self.client.post("/api/predict/", payload, format="json")
+        self.client.post("/api/predict/", payload, format="json")
+        history = self.client.get(
+            "/api/history/", HTTP_X_DEVICE_ID=DEVICE_ID
+        ).json()["results"]
+        self.assertEqual(len(history), 1)
