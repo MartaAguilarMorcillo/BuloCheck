@@ -8,13 +8,84 @@
 </head>
 <body>
 
-  <!-- ── Header ────────────────────────────────────────────────────── -->
+<!-- ── Auth screens ───────────────────────────────────────────────── -->
+  <div id="auth-screen">
+
+    <!-- Login -->
+    <div id="login-screen">
+      <div class="auth-header">
+        <img src="icons/icon48.png" alt="BuloCheck" class="auth-icon" />
+        <h1 class="auth-title">BuloCheck</h1>
+        <p class="auth-subtitle">Fake News Detector</p>
+      </div>
+      <div class="auth-form">
+        <div class="auth-field">
+          <label class="auth-label">Email</label>
+          <input type="email" id="login-email" class="auth-input"
+                 placeholder="your@email.com" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Password</label>
+          <input type="password" id="login-password" class="auth-input"
+                 placeholder="••••••••" />
+        </div>
+        <div class="auth-error hidden" id="login-error"></div>
+        <button class="btn btn--primary btn--full" id="btn-login">
+          Log in
+        </button>
+        <p class="auth-switch">
+          Don't have an account?
+          <a href="#" id="link-to-register">Create account</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Register -->
+    <div id="register-screen" class="hidden">
+      <div class="auth-header">
+        <img src="icons/icon48.png" alt="BuloCheck" class="auth-icon" />
+        <h1 class="auth-title">BuloCheck</h1>
+        <p class="auth-subtitle">Create your account</p>
+      </div>
+      <div class="auth-form">
+        <div class="auth-field">
+          <label class="auth-label">Email</label>
+          <input type="email" id="register-email" class="auth-input"
+                 placeholder="your@email.com" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Password</label>
+          <input type="password" id="register-password" class="auth-input"
+                 placeholder="Min. 8 characters" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Confirm password</label>
+          <input type="password" id="register-password2" class="auth-input"
+                 placeholder="••••••••" />
+        </div>
+        <div class="auth-error hidden" id="register-error"></div>
+        <button class="btn btn--primary btn--full" id="btn-register">
+          Create account
+        </button>
+        <p class="auth-switch">
+          Already have an account?
+          <a href="#" id="link-to-login">Log in</a>
+        </p>
+      </div>
+    </div>
+
+  </div><!-- /auth-screen -->
+
+  <!-- ── Main app (hidden until authenticated) ──────────────────────── -->
+  <div id="app-screen" class="hidden">
+
+<!-- ── Header ────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="header__logo">
       <img src="icons/icon48.png" alt="BuloCheck" class="header__icon" />
       <span class="header__title">BuloCheck</span>
     </div>
-    <span class="header__tagline">Fake News Detector</span>
+    <button class="btn--logout" id="btn-logout" title="Log out">⏻</button>  <!-- ← sustituye el span -->
   </header>
 
   <!-- ── Tab navigation ────────────────────────────────────────────── -->
@@ -205,6 +276,8 @@
 
   </section>
 
+  </div>
+  
   <script src="popup.js"></script>
 </body>
 </html>
