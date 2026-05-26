@@ -176,7 +176,7 @@ class HistoryView(APIView):
         checks = request.user.checks.select_related("news_source").all()
         total = checks.count()
         total_pages = max(1, -(-total // page_size))
-        page_checks = checks[(page - 1) * page_size : page * page_size]
+        page_checks = checks[(page - 1) * page_size:page * page_size]
 
         return Response(
             {

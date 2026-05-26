@@ -6,7 +6,6 @@ test_api.py — API tests for all endpoints:
   - GET  /api/similar/
 """
 
-import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model

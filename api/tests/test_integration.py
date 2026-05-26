@@ -2,7 +2,6 @@
 test_integration.py — Integration tests: full request → DB → response flow.
 """
 
-import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
