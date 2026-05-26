@@ -39,6 +39,7 @@ MOCK_PREDICTION = {
 # validate_not_empty
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class ValidateNotEmptyTest(TestCase):
 
     def test_valid_text(self):
@@ -67,6 +68,7 @@ class ValidateNotEmptyTest(TestCase):
 # validate_length
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class ValidateLengthTest(TestCase):
 
     def _validate(self, text):
@@ -86,7 +88,9 @@ class ValidateLengthTest(TestCase):
         self.assertTrue(self._validate("Breaking news today").is_valid)
 
     def test_exactly_two_words_invalid(self):
-        self.assertTrue(self._validate("Breaking news is happening right now ok").is_valid)
+        self.assertTrue(
+            self._validate("Breaking news is happening right now ok").is_valid
+        )
 
     def test_too_long_chars(self):
         result = self._validate("word " * 100)
@@ -103,6 +107,7 @@ class ValidateLengthTest(TestCase):
 # validate_real_words
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class ValidateRealWordsTest(TestCase):
 
     def test_valid_english_text(self):
@@ -115,18 +120,27 @@ class ValidateRealWordsTest(TestCase):
         self.assertFalse(validate_real_words("!!! ??? ### $$$ @@@", "Title").is_valid)
 
     def test_mixed_gibberish(self):
-        self.assertFalse(validate_real_words("1234 &%()! dsdjfncfef 9999 @@@@", "Title").is_valid)
+        self.assertFalse(
+            validate_real_words("1234 &%()! dsdjfncfef 9999 @@@@", "Title").is_valid
+        )
 
     def test_mostly_numbers_with_some_words(self):
-        self.assertFalse(validate_real_words("123 456 789 hello 000 111 222", "Title").is_valid)
+        self.assertFalse(
+            validate_real_words("123 456 789 hello 000 111 222", "Title").is_valid
+        )
 
     def test_text_with_some_numbers_is_valid(self):
-        self.assertTrue(validate_real_words("Trump wins 2024 election by 5 points", "Title").is_valid)
+        self.assertTrue(
+            validate_real_words(
+                "Trump wins 2024 election by 5 points", "Title"
+            ).is_valid
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # validate_not_repetitive
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class ValidateNotRepetitiveTest(TestCase):
 
@@ -141,17 +155,25 @@ class ValidateNotRepetitiveTest(TestCase):
         self.assertTrue(any("repetitive" in e for e in result.errors))
 
     def test_same_word_10_times(self):
-        self.assertFalse(validate_not_repetitive(" ".join(["test"] * 10), "Title").is_valid)
+        self.assertFalse(
+            validate_not_repetitive(" ".join(["test"] * 10), "Title").is_valid
+        )
 
     def test_same_word_3_times_is_ok(self):
-        self.assertTrue(validate_not_repetitive(
-            "the president the government the people voted for change today", "Title"
-        ).is_valid)
+        self.assertTrue(
+            validate_not_repetitive(
+                "the president the government the people voted for change today",
+                "Title",
+            ).is_valid
+        )
 
     def test_word_repeated_just_below_threshold(self):
-        self.assertTrue(validate_not_repetitive(
-            "the news today is big the story broke the journalists reported it", "Title"
-        ).is_valid)
+        self.assertTrue(
+            validate_not_repetitive(
+                "the news today is big the story broke the journalists reported it",
+                "Title",
+            ).is_valid
+        )
 
     def test_error_message_contains_word(self):
         result = validate_not_repetitive(" ".join(["spam"] * 8), "Title")
@@ -162,6 +184,7 @@ class ValidateNotRepetitiveTest(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # validate_language
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class ValidateLanguageTest(TestCase):
 
@@ -207,6 +230,7 @@ class ValidateLanguageTest(TestCase):
 # validate_title / validate_body (combined)
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class ValidateTitleTest(TestCase):
 
     def test_valid_title(self):
@@ -247,7 +271,9 @@ class ValidateBodyTest(TestCase):
         self.assertFalse(validate_body("Short text").is_valid)
 
     def test_gibberish_body(self):
-        self.assertFalse(validate_body("1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000").is_valid)
+        self.assertFalse(
+            validate_body("1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000").is_valid
+        )
 
     def test_repetitive_body(self):
         self.assertFalse(validate_body(" ".join(["word"] * 20)).is_valid)
@@ -265,6 +291,7 @@ class ValidateBodyTest(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # API integration — validations in /api/predict/
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class PredictValidationAPITest(APITestCase):
 
@@ -291,14 +318,18 @@ class PredictValidationAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_gibberish_title_returns_422(self):
-        response = self._post({"title": "1234 &%()! dsdjfncfef 9999 @@@@", "text": VALID_BODY})
+        response = self._post(
+            {"title": "1234 &%()! dsdjfncfef 9999 @@@@", "text": VALID_BODY}
+        )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_repetitive_title_returns_422(self):
-        response = self._post({
-            "title": "example example example example example example example example",
-            "text": VALID_BODY,
-        })
+        response = self._post(
+            {
+                "title": "example example example example example example example example",
+                "text": VALID_BODY,
+            }
+        )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_empty_body_returns_422(self):
@@ -310,10 +341,12 @@ class PredictValidationAPITest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_gibberish_body_returns_422(self):
-        response = self._post({
-            "title": VALID_TITLE,
-            "text": "1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000 %%%",
-        })
+        response = self._post(
+            {
+                "title": VALID_TITLE,
+                "text": "1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000 %%%",
+            }
+        )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_validation_errors_in_response(self):
@@ -325,19 +358,22 @@ class PredictValidationAPITest(APITestCase):
 
     def test_invalid_content_is_not_saved_to_db(self):
         from api.models import NewsCheck
+
         self._post({"title": "bad", "text": VALID_BODY})
         self.assertEqual(NewsCheck.objects.count(), 0)
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_non_english_returns_200_with_warning(self, _):
-        response = self._post({
-            "title": "El presidente anuncia nuevas medidas económicas para el país hoy",
-            "text": (
-                "El gobierno español ha anunciado hoy nuevas medidas económicas "
-                "para hacer frente a la crisis. El presidente compareció ante los "
-                "medios de comunicación para explicar el nuevo plan de acción nacional."
-            ),
-        })
+        response = self._post(
+            {
+                "title": "El presidente anuncia nuevas medidas económicas para el país hoy",
+                "text": (
+                    "El gobierno español ha anunciado hoy nuevas medidas económicas "
+                    "para hacer frente a la crisis. El presidente compareció ante los "
+                    "medios de comunicación para explicar el nuevo plan de acción nacional."
+                ),
+            }
+        )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
         self.assertIn("label", data)

@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import User, NewsCheck, NewsSource
+
+from .models import NewsCheck, NewsSource, User
 
 
 @admin.register(User)
@@ -20,7 +21,14 @@ class NewsSourceAdmin(admin.ModelAdmin):
 
 @admin.register(NewsCheck)
 class NewsCheckAdmin(admin.ModelAdmin):
-    list_display = ["id", "label", "confidence", "news_source", "title_short", "created_at"]
+    list_display = [
+        "id",
+        "label",
+        "confidence",
+        "news_source",
+        "title_short",
+        "created_at",
+    ]
     list_filter = ["label", "news_source"]
     search_fields = ["title", "news_source__name", "news_source__domain"]
     ordering = ["-created_at"]
@@ -28,4 +36,5 @@ class NewsCheckAdmin(admin.ModelAdmin):
 
     def title_short(self, obj):
         return obj.title[:60]
+
     title_short.short_description = "Title"

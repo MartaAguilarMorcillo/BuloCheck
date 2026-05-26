@@ -1,13 +1,14 @@
-from rest_framework import serializers
-
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+
 from .models import NewsCheck, NewsSource
 
 User = get_user_model()
 
+
 class RegisterSerializer(serializers.ModelSerializer):
     """Validates and creates a new user."""
+
     password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:

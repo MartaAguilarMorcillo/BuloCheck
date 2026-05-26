@@ -36,6 +36,7 @@ def make_user(email="test@example.com", password="testpass123"):
 # 1. NewsSource model tests
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class NewsSourceModelTest(TestCase):
 
     def test_create_predefined_source(self):
@@ -45,16 +46,20 @@ class NewsSourceModelTest(TestCase):
         self.assertIsNotNone(source.logo_url)
 
     def test_logo_url_is_optional(self):
-        source = NewsSource.objects.create(name="Unknown Source", domain="unknown-test.com")
+        source = NewsSource.objects.create(
+            name="Unknown Source", domain="unknown-test.com"
+        )
         self.assertIsNone(source.logo_url)
 
     def test_domain_is_unique(self):
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             NewsSource.objects.create(name="BBC Copy", domain="bbc.com")
 
     def test_name_is_unique(self):
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             NewsSource.objects.create(name="BBC", domain="bbc-copy.com")
 
@@ -64,7 +69,9 @@ class NewsSourceModelTest(TestCase):
         self.assertIn("bbc.com", str(source))
 
     def test_is_predefined_defaults_to_false(self):
-        source = NewsSource.objects.create(name="New Source Test", domain="newsourcetest.com")
+        source = NewsSource.objects.create(
+            name="New Source Test", domain="newsourcetest.com"
+        )
         self.assertFalse(source.is_predefined)
 
     def test_predefined_sources_loaded_by_migration(self):
@@ -86,6 +93,7 @@ class NewsSourceModelTest(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # 2. source_utils tests
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class GetOrCreateSourceTest(TestCase):
 
@@ -122,6 +130,7 @@ class GetOrCreateSourceTest(TestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. SourceLookupView tests — GET /api/sources/lookup/
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class SourceLookupViewTest(APITestCase):
 
@@ -162,6 +171,7 @@ class SourceLookupViewTest(APITestCase):
 # 4. PredictView with domain
 # ═══════════════════════════════════════════════════════════════════════════
 
+
 class PredictWithSourceTest(APITestCase):
 
     def setUp(self):
@@ -170,11 +180,15 @@ class PredictWithSourceTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_predict_with_known_domain_returns_source(self, _):
-        response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-        }, format="json")
+        response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+            },
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         data = response.json()
@@ -185,10 +199,14 @@ class PredictWithSourceTest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_predict_without_domain_returns_null_source(self, _):
-        response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-        }, format="json")
+        response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+            },
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNone(response.json()["news_source"])
@@ -197,26 +215,36 @@ class PredictWithSourceTest(APITestCase):
     @patch("api.views.get_or_create_source")
     def test_predict_with_unknown_domain_creates_source(self, mock_get_source, _):
         new_source = NewsSource.objects.create(
-            name="Unknown News", domain="unknownnews.com", is_predefined=False,
+            name="Unknown News",
+            domain="unknownnews.com",
+            is_predefined=False,
         )
         mock_get_source.return_value = new_source
 
-        response = self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "unknownnews.com",
-        }, format="json")
+        response = self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "unknownnews.com",
+            },
+            format="json",
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         mock_get_source.assert_called_once_with("unknownnews.com")
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_predict_saves_news_source_fk_in_db(self, _):
-        self.client.post("/api/predict/", {
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-        }, format="json")
+        self.client.post(
+            "/api/predict/",
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+            },
+            format="json",
+        )
 
         check = NewsCheck.objects.first()
         self.assertIsNotNone(check.news_source)
@@ -226,6 +254,7 @@ class PredictWithSourceTest(APITestCase):
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. SourceStatsView with NewsSource objects
 # ═══════════════════════════════════════════════════════════════════════════
+
 
 class SourceStatsWithNewsSourceTest(APITestCase):
 
@@ -237,8 +266,11 @@ class SourceStatsWithNewsSourceTest(APITestCase):
 
     def _make_check(self, source, label, confidence=0.80):
         check = NewsCheck.objects.create(
-            title=SAMPLE_TITLE, text=SAMPLE_TEXT,
-            news_source=source, label=label, confidence=confidence,
+            title=SAMPLE_TITLE,
+            text=SAMPLE_TEXT,
+            news_source=source,
+            label=label,
+            confidence=confidence,
         )
         check.users.add(self.user)
         return check

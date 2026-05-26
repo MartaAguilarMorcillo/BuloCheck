@@ -37,11 +37,20 @@ def make_user(email="test@example.com", password="testpass123"):
     return User.objects.create_user(email=email, password=password)
 
 
-def make_check(user, label="REAL", confidence=0.75, news_source=None,
-               title=SAMPLE_TITLE, text=SAMPLE_TEXT):
+def make_check(
+    user,
+    label="REAL",
+    confidence=0.75,
+    news_source=None,
+    title=SAMPLE_TITLE,
+    text=SAMPLE_TEXT,
+):
     check = NewsCheck.objects.create(
-        title=title, text=text, news_source=news_source,
-        label=label, confidence=confidence,
+        title=title,
+        text=text,
+        news_source=news_source,
+        label=label,
+        confidence=confidence,
     )
     check.users.add(user)
     return check
@@ -50,6 +59,7 @@ def make_check(user, label="REAL", confidence=0.75, news_source=None,
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /api/predict/
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class PredictViewTest(APITestCase):
 
@@ -118,6 +128,7 @@ class PredictViewTest(APITestCase):
 # GET /api/history/
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class HistoryViewTest(APITestCase):
 
     def setUp(self):
@@ -132,8 +143,9 @@ class HistoryViewTest(APITestCase):
 
     def test_history_returns_401_without_auth(self):
         self.client.force_authenticate(user=None)
-        self.assertEqual(self.client.get("/api/history/").status_code,
-                         status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            self.client.get("/api/history/").status_code, status.HTTP_401_UNAUTHORIZED
+        )
 
     def test_history_returns_empty_when_no_checks(self):
         data = self._get().json()
@@ -158,6 +170,7 @@ class HistoryViewTest(APITestCase):
 
     def test_history_ordered_newest_first(self):
         from datetime import timedelta
+
         from django.utils import timezone
 
         check1 = make_check(self.user, title="First")
@@ -180,8 +193,15 @@ class HistoryViewTest(APITestCase):
     def test_history_result_item_fields(self):
         make_check(self.user)
         item = self._get().json()["results"][0]
-        for field in ["id", "title", "text", "news_source", "label",
-                      "confidence", "created_at"]:
+        for field in [
+            "id",
+            "title",
+            "text",
+            "news_source",
+            "label",
+            "confidence",
+            "created_at",
+        ]:
             self.assertIn(field, item)
 
     def test_history_pagination(self):
@@ -204,6 +224,7 @@ class HistoryViewTest(APITestCase):
 # GET /api/sources/
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class SourceStatsViewTest(APITestCase):
 
     def setUp(self):
@@ -219,8 +240,9 @@ class SourceStatsViewTest(APITestCase):
 
     def test_sources_returns_401_without_auth(self):
         self.client.force_authenticate(user=None)
-        self.assertEqual(self.client.get("/api/sources/").status_code,
-                         status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(
+            self.client.get("/api/sources/").status_code, status.HTTP_401_UNAUTHORIZED
+        )
 
     def test_sources_returns_empty_when_no_source_informed(self):
         make_check(self.user, news_source=None)
@@ -244,8 +266,14 @@ class SourceStatsViewTest(APITestCase):
         self.assertEqual(data[1]["news_source"]["domain"], "bbc.com")
 
     def test_sources_returns_max_5(self):
-        for domain in ["bbc.com", "nytimes.com", "foxnews.com",
-                       "cnn.com", "theguardian.com", "reuters.com"]:
+        for domain in [
+            "bbc.com",
+            "nytimes.com",
+            "foxnews.com",
+            "cnn.com",
+            "theguardian.com",
+            "reuters.com",
+        ]:
             src = NewsSource.objects.get(domain=domain)
             make_check(self.user, news_source=src, label="REAL")
         self.assertLessEqual(len(self._get().json()), 5)
@@ -253,8 +281,14 @@ class SourceStatsViewTest(APITestCase):
     def test_sources_response_fields(self):
         make_check(self.user, news_source=self.bbc, label="REAL", confidence=0.80)
         item = self._get().json()[0]
-        for field in ["news_source", "total", "real", "fake",
-                      "real_confidence_avg", "reliability_pct"]:
+        for field in [
+            "news_source",
+            "total",
+            "real",
+            "fake",
+            "real_confidence_avg",
+            "reliability_pct",
+        ]:
             self.assertIn(field, item)
         for field in ["id", "name", "domain", "logo_url", "is_predefined"]:
             self.assertIn(field, item["news_source"])
@@ -310,6 +344,7 @@ class SourceStatsViewTest(APITestCase):
 # GET /api/similar/
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class SimilarNewsViewTest(APITestCase):
 
     def setUp(self):
@@ -318,12 +353,18 @@ class SimilarNewsViewTest(APITestCase):
         self.bbc = NewsSource.objects.get(domain="bbc.com")
         self.buzzfeed = NewsSource.objects.get(domain="buzzfeednews.com")
 
-        make_check(self.user,
+        make_check(
+            self.user,
             title="Facebook Continues To Host Militant Groups And Ads Despite Ban",
-            label="REAL", news_source=self.buzzfeed)
-        make_check(self.user,
+            label="REAL",
+            news_source=self.buzzfeed,
+        )
+        make_check(
+            self.user,
             title="Trump loses the presidential election by wide margin",
-            label="FAKE", news_source=self.bbc)
+            label="FAKE",
+            news_source=self.bbc,
+        )
 
     def test_similar_returns_200(self):
         response = self.client.get("/api/similar/?title=Facebook groups militant ban")
@@ -340,51 +381,70 @@ class SimilarNewsViewTest(APITestCase):
 
     def test_similar_response_fields(self):
         response = self.client.get(
-            "/api/similar/?title=Facebook groups militant ban&min_sim=0.1")
+            "/api/similar/?title=Facebook groups militant ban&min_sim=0.1"
+        )
         if response.json():
             item = response.json()[0]
-            for field in ["title", "source_name", "source_logo", "label",
-                          "similarity", "fts_rank", "match_type"]:
+            for field in [
+                "title",
+                "source_name",
+                "source_logo",
+                "label",
+                "similarity",
+                "fts_rank",
+                "match_type",
+            ]:
                 self.assertIn(field, item)
 
     def test_similar_returns_empty_when_no_match(self):
         response = self.client.get(
-            "/api/similar/?title=Cooking recipes pasta carbonara&min_sim=0.9")
+            "/api/similar/?title=Cooking recipes pasta carbonara&min_sim=0.9"
+        )
         self.assertEqual(response.json(), [])
 
     def test_similar_trigram_match(self):
         response = self.client.get(
-            "/api/similar/?title=Facebook Continues Hosting Militant Groups Ban&min_sim=0.2")
+            "/api/similar/?title=Facebook Continues Hosting Militant Groups Ban&min_sim=0.2"
+        )
         titles = [item["title"] for item in response.json()]
         self.assertIn(
-            "Facebook Continues To Host Militant Groups And Ads Despite Ban", titles)
+            "Facebook Continues To Host Militant Groups And Ads Despite Ban", titles
+        )
 
     def test_similar_fulltext_match(self):
         response = self.client.get(
-            "/api/similar/?title=Trump lost the election defeat&min_sim=0.01")
+            "/api/similar/?title=Trump lost the election defeat&min_sim=0.01"
+        )
         titles = [item["title"] for item in response.json()]
         self.assertIn("Trump loses the presidential election by wide margin", titles)
 
     def test_similar_returns_max_5_results(self):
         for i in range(6):
-            make_check(self.user,
+            make_check(
+                self.user,
                 title=f"Facebook militant groups ban extremism report {i}",
-                label="FAKE", news_source=self.buzzfeed)
+                label="FAKE",
+                news_source=self.buzzfeed,
+            )
         response = self.client.get(
-            "/api/similar/?title=Facebook militant groups ban&min_sim=0.1")
+            "/api/similar/?title=Facebook militant groups ban&min_sim=0.1"
+        )
         self.assertLessEqual(len(response.json()), 5)
 
     def test_similar_excludes_exact_title(self):
         response = self.client.get(
-            "/api/similar/?title=Facebook Continues To Host Militant Groups Despite Ban&min_sim=0.1")
+            "/api/similar/?title=Facebook Continues To Host Militant Groups Despite Ban&min_sim=0.1"
+        )
         titles = [item["title"] for item in response.json()]
         self.assertNotIn(
-            "Facebook Continues To Host Militant Groups Despite Ban", titles)
+            "Facebook Continues To Host Militant Groups Despite Ban", titles
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Deduplication
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class NewsCheckDeduplicationTest(APITestCase):
 

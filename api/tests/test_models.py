@@ -21,11 +21,20 @@ def make_user(email="test@example.com", password="testpass123"):
     return User.objects.create_user(email=email, password=password)
 
 
-def make_check(user, label="REAL", confidence=0.75, news_source=None,
-               title=SAMPLE_TITLE, text=SAMPLE_TEXT):
+def make_check(
+    user,
+    label="REAL",
+    confidence=0.75,
+    news_source=None,
+    title=SAMPLE_TITLE,
+    text=SAMPLE_TEXT,
+):
     check = NewsCheck.objects.create(
-        title=title, text=text, news_source=news_source,
-        label=label, confidence=confidence,
+        title=title,
+        text=text,
+        news_source=news_source,
+        label=label,
+        confidence=confidence,
     )
     check.users.add(user)
     return check
@@ -34,6 +43,7 @@ def make_check(user, label="REAL", confidence=0.75, news_source=None,
 # ─────────────────────────────────────────────────────────────────────────────
 # User model
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class UserModelTest(TestCase):
 
@@ -87,6 +97,7 @@ class UserModelTest(TestCase):
 # NewsCheck model
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class NewsCheckModelTest(TestCase):
 
     def setUp(self):
@@ -99,8 +110,10 @@ class NewsCheckModelTest(TestCase):
 
     def test_source_is_optional(self):
         check = NewsCheck.objects.create(
-            title=SAMPLE_TITLE, text=SAMPLE_TEXT,
-            label="FAKE", confidence=0.9,
+            title=SAMPLE_TITLE,
+            text=SAMPLE_TEXT,
+            label="FAKE",
+            confidence=0.9,
         )
         check.users.add(self.user)
         self.assertIsNone(check.news_source)

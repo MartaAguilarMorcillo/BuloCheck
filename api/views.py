@@ -9,8 +9,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .ml import predict_news
 from .models import NewsCheck, NewsSource
 from .serializers import (
-    NewsCheckSerializer, NewsSourceSerializer,
-    PredictRequestSerializer, RegisterSerializer,
+    NewsCheckSerializer,
+    NewsSourceSerializer,
+    PredictRequestSerializer,
+    RegisterSerializer,
 )
 from .source_utils import get_or_create_source
 from .validators import validate_body, validate_title
@@ -25,6 +27,7 @@ class RegisterView(APIView):
     Request: { "email": "...", "password": "..." }
     Response: { "access": "...", "refresh": "..." }
     """
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -35,14 +38,18 @@ class RegisterView(APIView):
         user = serializer.save()
         refresh = RefreshToken.for_user(user)
 
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }, status=status.HTTP_201_CREATED)
+        return Response(
+            {
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class PredictView(APIView):
     """POST /api/predict/ — requires authentication."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -72,7 +79,9 @@ class PredictView(APIView):
         # Check if article already exists
         user = request.user
         existing_check = NewsCheck.objects.filter(
-            title=title, text=text, news_source=news_source,
+            title=title,
+            text=text,
+            news_source=news_source,
         ).first()
 
         if existing_check:
@@ -81,13 +90,27 @@ class PredictView(APIView):
                 "label": existing_check.label,
                 "confidence": existing_check.confidence,
                 "probas": {
-                    "REAL": round(existing_check.confidence if existing_check.label == "REAL"
-                                  else 1 - existing_check.confidence, 4),
-                    "FAKE": round(existing_check.confidence if existing_check.label == "FAKE"
-                                  else 1 - existing_check.confidence, 4),
+                    "REAL": round(
+                        (
+                            existing_check.confidence
+                            if existing_check.label == "REAL"
+                            else 1 - existing_check.confidence
+                        ),
+                        4,
+                    ),
+                    "FAKE": round(
+                        (
+                            existing_check.confidence
+                            if existing_check.label == "FAKE"
+                            else 1 - existing_check.confidence
+                        ),
+                        4,
+                    ),
                 },
                 "check_id": existing_check.id,
-                "news_source": NewsSourceSerializer(news_source).data if news_source else None,
+                "news_source": (
+                    NewsSourceSerializer(news_source).data if news_source else None
+                ),
                 "from_cache": True,
             }
             if warnings:
@@ -101,7 +124,9 @@ class PredictView(APIView):
             error_msg = str(e)
             if "timed out" in error_msg.lower():
                 return Response(
-                    {"error": "The model is waking up, please try again in 30 seconds."},
+                    {
+                        "error": "The model is waking up, please try again in 30 seconds."
+                    },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
                 )
             return Response(
@@ -110,8 +135,11 @@ class PredictView(APIView):
             )
 
         check = NewsCheck.objects.create(
-            title=title, text=text, news_source=news_source,
-            label=result["label"], confidence=result["confidence"],
+            title=title,
+            text=text,
+            news_source=news_source,
+            label=result["label"],
+            confidence=result["confidence"],
         )
         check.users.add(user)
 
@@ -120,7 +148,9 @@ class PredictView(APIView):
             "confidence": result["confidence"],
             "probas": result["probas"],
             "check_id": check.id,
-            "news_source": NewsSourceSerializer(news_source).data if news_source else None,
+            "news_source": (
+                NewsSourceSerializer(news_source).data if news_source else None
+            ),
             "from_cache": False,
         }
         if warnings:
@@ -130,6 +160,7 @@ class PredictView(APIView):
 
 class HistoryView(APIView):
     """GET /api/history/ — paginated history for the authenticated user."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -145,24 +176,27 @@ class HistoryView(APIView):
         checks = request.user.checks.select_related("news_source").all()
         total = checks.count()
         total_pages = max(1, -(-total // page_size))
-        page_checks = checks[(page - 1) * page_size: page * page_size]
+        page_checks = checks[(page - 1) * page_size : page * page_size]
 
-        return Response({
-            "count": total,
-            "total_pages": total_pages,
-            "current_page": page,
-            "results": NewsCheckSerializer(page_checks, many=True).data,
-        })
+        return Response(
+            {
+                "count": total,
+                "total_pages": total_pages,
+                "current_page": page,
+                "results": NewsCheckSerializer(page_checks, many=True).data,
+            }
+        )
 
 
 class SourceStatsView(APIView):
     """GET /api/sources/ — top 5 most reliable sources for the authenticated user."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        checks = request.user.checks.filter(
-            news_source__isnull=False
-        ).select_related("news_source")
+        checks = request.user.checks.filter(news_source__isnull=False).select_related(
+            "news_source"
+        )
 
         if not checks.exists():
             return Response([])
@@ -173,7 +207,9 @@ class SourceStatsView(APIView):
             if src_id not in stats:
                 stats[src_id] = {
                     "news_source": check.news_source,
-                    "total": 0, "real": 0, "fake": 0,
+                    "total": 0,
+                    "real": 0,
+                    "fake": 0,
                     "real_confidence_sum": 0.0,
                 }
             stats[src_id]["total"] += 1
@@ -188,16 +224,19 @@ class SourceStatsView(APIView):
             real_count = src_data["real"]
             real_confidence_avg = (
                 round(src_data["real_confidence_sum"] / real_count, 4)
-                if real_count > 0 else 0.0
+                if real_count > 0
+                else 0.0
             )
-            result.append({
-                "news_source": NewsSourceSerializer(src_data["news_source"]).data,
-                "total": src_data["total"],
-                "real": real_count,
-                "fake": src_data["fake"],
-                "real_confidence_avg": real_confidence_avg,
-                "reliability_pct": round(real_count / src_data["total"] * 100, 1),
-            })
+            result.append(
+                {
+                    "news_source": NewsSourceSerializer(src_data["news_source"]).data,
+                    "total": src_data["total"],
+                    "real": real_count,
+                    "fake": src_data["fake"],
+                    "real_confidence_avg": real_confidence_avg,
+                    "reliability_pct": round(real_count / src_data["total"] * 100, 1),
+                }
+            )
 
         result.sort(key=lambda x: (x["real"], x["real_confidence_avg"]), reverse=True)
         return Response(result[:5])
@@ -205,6 +244,7 @@ class SourceStatsView(APIView):
 
 class SourceLookupView(APIView):
     """GET /api/sources/lookup/?domain=bbc.com"""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -223,6 +263,7 @@ class SourceLookupView(APIView):
 
 class SimilarNewsView(APIView):
     """GET /api/similar/?title=... — hybrid trigram + full-text search."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -238,7 +279,8 @@ class SimilarNewsView(APIView):
             min_sim = 0.25
 
         with connection.cursor() as cursor:
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT nc.title, ns.name, ns.logo_url, nc.label,
                     ROUND(COALESCE(similarity(nc.title, %s), 0)::numeric, 4),
                     ROUND(COALESCE(ts_rank(to_tsvector('english', nc.title),
@@ -260,18 +302,37 @@ class SimilarNewsView(APIView):
                     COALESCE(ts_rank(to_tsvector('english', nc.title),
                         plainto_tsquery('english', %s)), 0)) DESC
                 LIMIT 5
-            """, [
-                title, title,
-                title, min_sim, title,
-                title, min_sim,
-                title,
-                title, min_sim, title, min_sim,
-                title, title,
-            ])
+            """,
+                [
+                    title,
+                    title,
+                    title,
+                    min_sim,
+                    title,
+                    title,
+                    min_sim,
+                    title,
+                    title,
+                    min_sim,
+                    title,
+                    min_sim,
+                    title,
+                    title,
+                ],
+            )
             rows = cursor.fetchall()
 
-        return Response([{
-            "title": r[0], "source_name": r[1], "source_logo": r[2],
-            "label": r[3], "similarity": float(r[4]),
-            "fts_rank": float(r[5]), "match_type": r[6],
-        } for r in rows])
+        return Response(
+            [
+                {
+                    "title": r[0],
+                    "source_name": r[1],
+                    "source_logo": r[2],
+                    "label": r[3],
+                    "similarity": float(r[4]),
+                    "fts_rank": float(r[5]),
+                    "match_type": r[6],
+                }
+                for r in rows
+            ]
+        )

@@ -1,5 +1,10 @@
 import uuid
-from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    BaseUserManager,
+    PermissionsMixin,
+)
 from django.db import models
 
 
@@ -26,6 +31,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     Custom user model using email as the unique identifier.
     No username — email + password only.
     """
+
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
@@ -45,6 +51,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 class NewsSource(models.Model):
     """Represents a news outlet."""
+
     name = models.CharField(max_length=200, unique=True, null=True, blank=True)
     domain = models.CharField(max_length=200, unique=True)
     logo_url = models.URLField(max_length=500, null=True, blank=True)

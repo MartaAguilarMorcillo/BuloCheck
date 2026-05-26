@@ -22,19 +22,23 @@ class PredictRequestSerializerTest(TestCase):
 
     def test_valid_data_with_domain(self):
         """Serializer is valid with all fields including domain."""
-        s = self._get_serializer({
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "bbc.com",
-        })
+        s = self._get_serializer(
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "bbc.com",
+            }
+        )
         self.assertTrue(s.is_valid())
 
     def test_valid_data_without_domain(self):
         """Serializer is valid without optional domain field."""
-        s = self._get_serializer({
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-        })
+        s = self._get_serializer(
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+            }
+        )
         self.assertTrue(s.is_valid())
 
     def test_missing_title_is_invalid(self):
@@ -51,11 +55,13 @@ class PredictRequestSerializerTest(TestCase):
 
     def test_blank_domain_is_allowed(self):
         """Serializer accepts blank domain."""
-        s = self._get_serializer({
-            "title": SAMPLE_TITLE,
-            "text": SAMPLE_TEXT,
-            "domain": "",
-        })
+        s = self._get_serializer(
+            {
+                "title": SAMPLE_TITLE,
+                "text": SAMPLE_TEXT,
+                "domain": "",
+            }
+        )
         self.assertTrue(s.is_valid())
 
 
@@ -78,8 +84,15 @@ class NewsCheckSerializerTest(TestCase):
 
     def test_serializes_correct_fields(self):
         s = NewsCheckSerializer(self.check)
-        for field in ["id", "title", "text", "news_source",
-                      "label", "confidence", "created_at"]:
+        for field in [
+            "id",
+            "title",
+            "text",
+            "news_source",
+            "label",
+            "confidence",
+            "created_at",
+        ]:
             self.assertIn(field, s.data)
 
     def test_does_not_expose_user(self):
