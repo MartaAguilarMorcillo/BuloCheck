@@ -4,7 +4,7 @@
  */
 
 // ── Config ─────────────────────────────────────────────────────────────────
-const BASE_URL = "http://127.0.0.1:8000/api";
+const BASE_URL = "https://bulocheck-backend.onrender.com/api";
 const PAGE_SIZE = 3;
 
 // ── State ──────────────────────────────────────────────────────────────────
