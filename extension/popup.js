@@ -9,10 +9,10 @@ const PAGE_SIZE = 3;
 
 // ── State ──────────────────────────────────────────────────────────────────
 const state = {
-  deviceId: null,
   domain: null,
   title: "",
   body: "",
+  similarTitle: null,
   lastResult: null,
   isReadMode: false,
   historyPage: 1,
@@ -22,8 +22,14 @@ const state = {
 // ── DOM refs ────────────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 
-const tabBtns    = document.querySelectorAll(".tab-btn");
-const tabPanels  = document.querySelectorAll(".tab-panel");
+const tabBtns   = document.querySelectorAll(".tab-btn");
+const tabPanels = document.querySelectorAll(".tab-panel");
+
+// Auth
+const authScreen     = $("auth-screen");
+const appScreen      = $("app-screen");
+const loginScreen    = $("login-screen");
+const registerScreen = $("register-screen");
 
 // Tab 1
 const analyzeMode   = $("analyze-mode");
@@ -56,9 +62,9 @@ const histPag      = $("history-pagination");
 const histEmpty    = $("history-empty");
 
 // Tab 3
-const similarList  = $("similar-list");
-const similarEmpty = $("similar-empty");
-const similarNone  = $("similar-no-title");
+const similarList   = $("similar-list");
+const similarEmpty  = $("similar-empty");
+const similarNone   = $("similar-no-title");
 const simQueryTitle = $("similar-query-title");
 
 // Tab 4
@@ -66,16 +72,292 @@ const podiumEl     = $("podium");
 const sourcesEmpty = $("sources-empty");
 
 // ══════════════════════════════════════════════════════════════════════════════
-// UTILS
+// TOKEN STORAGE
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function getOrCreateDeviceId() {
-  const result = await chrome.storage.local.get("device_id");
-  if (result.device_id) return result.device_id;
-  const deviceId = crypto.randomUUID();
-  await chrome.storage.local.set({ device_id: deviceId });
-  return deviceId;
+async function getTokens() {
+  return await chrome.storage.local.get(["access_token", "refresh_token"]);
 }
+
+async function saveTokens(access, refresh) {
+  await chrome.storage.local.set({
+    access_token: access,
+    refresh_token: refresh,
+  });
+}
+
+async function clearTokens() {
+  await chrome.storage.local.remove(["access_token", "refresh_token"]);
+}
+
+async function getAuthHeader() {
+  var tokens = await getTokens();
+  if (!tokens.access_token) throw new Error("Not authenticated.");
+  return { "Authorization": "Bearer " + tokens.access_token };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTH SCREEN MANAGEMENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+function showApp() {
+  authScreen.classList.add("hidden");
+  appScreen.classList.remove("hidden");
+}
+
+function showLogin() {
+  appScreen.classList.add("hidden");
+  authScreen.classList.remove("hidden");
+  loginScreen.classList.remove("hidden");
+  registerScreen.classList.add("hidden");
+  $("login-error").classList.add("hidden");
+  $("login-email").value = "";
+  $("login-password").value = "";
+}
+
+function showRegister() {
+  loginScreen.classList.add("hidden");
+  registerScreen.classList.remove("hidden");
+  $("register-error").classList.add("hidden");
+  $("register-email").value = "";
+  $("register-password").value = "";
+  $("register-password2").value = "";
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTH API
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function apiLogin(email, password) {
+  var res = await fetch(BASE_URL + "/auth/login/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email, password: password }),
+  });
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Invalid email or password.");
+  return data;
+}
+
+async function apiRegister(email, password) {
+  var res = await fetch(BASE_URL + "/auth/register/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email, password: password }),
+  });
+  var data = await res.json();
+  if (!res.ok) {
+    var msg = (data.email && data.email[0]) ||
+              (data.password && data.password[0]) ||
+              "Registration failed.";
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function apiRefresh(refreshToken) {
+  var res = await fetch(BASE_URL + "/auth/refresh/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh: refreshToken }),
+  });
+  var data = await res.json();
+  if (!res.ok) throw new Error("Session expired. Please log in again.");
+  return data.access;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// AUTH EVENT LISTENERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+$("link-to-register").addEventListener("click", function(e) {
+  e.preventDefault();
+  showRegister();
+});
+
+$("link-to-login").addEventListener("click", function(e) {
+  e.preventDefault();
+  showLogin();
+});
+
+$("btn-login").addEventListener("click", async function() {
+  var email    = $("login-email").value.trim();
+  var password = $("login-password").value;
+  var errorEl  = $("login-error");
+
+  if (!email || !password) {
+    errorEl.textContent = "Please enter your email and password.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    var data = await apiLogin(email, password);
+    await saveTokens(data.access, data.refresh);
+    await initApp();
+    showApp();
+  } catch (err) {
+    var msg = err.message === "Failed to fetch"
+      ? "Could not connect to the server. Please try again later."
+      : err.message;
+    errorEl.textContent = msg;
+    errorEl.classList.remove("hidden");
+  }
+});
+
+$("btn-register").addEventListener("click", async function() {
+  var email     = $("register-email").value.trim();
+  var password  = $("register-password").value;
+  var password2 = $("register-password2").value;
+  var errorEl   = $("register-error");
+
+  if (!email || !password || !password2) {
+    errorEl.textContent = "Please fill in all fields.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  if (password !== password2) {
+    errorEl.textContent = "Passwords do not match.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  if (password.length < 8) {
+    errorEl.textContent = "Password must be at least 8 characters.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+
+  try {
+    var data = await apiRegister(email, password);
+    await saveTokens(data.access, data.refresh);
+
+    // Clean any leftover state from previous session
+    await chrome.storage.local.remove(["saved_title", "saved_body"]);
+    state.title = "";
+    state.body = "";
+    state.lastResult = null;
+    state.historyPage = 1;
+    state.historyTotalPages = 1;
+    historyList.innerHTML = "";
+    similarList.innerHTML = "";
+    podiumEl.innerHTML = "";
+
+    await initApp();
+    showApp();
+  } catch (err) {
+    var msg = err.message === "Failed to fetch"
+      ? "Could not connect to the server. Please try again later."
+      : err.message;
+    errorEl.textContent = msg;
+    errorEl.classList.remove("hidden");
+  }
+});
+
+$("btn-logout").addEventListener("click", async function() {
+  await clearTokens();
+  await chrome.storage.local.remove(["saved_title", "saved_body"]);
+
+  // Reset app state completely
+  state.title = "";
+  state.body = "";
+  state.lastResult = null;
+  state.isReadMode = false;
+  state.historyPage = 1;
+  state.historyTotalPages = 1;
+  state.domain = null;
+
+  // Reset all tabs to initial state
+  historyList.innerHTML = "";
+  similarList.innerHTML = "";
+  podiumEl.innerHTML = "";
+  simQueryTitle.textContent = "";
+  similarEmpty.classList.add("hidden");
+  similarNone.classList.add("hidden");
+  sourcesEmpty.classList.add("hidden");
+  histEmpty.classList.add("hidden");
+  histPag.classList.add("hidden");
+
+  // Reset tab navigation to first tab
+  switchTab("analyze");
+
+  resetAnalyzeTab();
+  showLogin();
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// APP API (with JWT auth)
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function apiPredict(title, text, domain) {
+  var headers = await getAuthHeader();
+  headers["Content-Type"] = "application/json";
+
+  var body = { title: title, text: text };
+  if (domain) body.domain = domain;
+
+  var res = await fetch(BASE_URL + "/predict/", {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify(body),
+  });
+
+  if (res.status === 401) {
+    try {
+      var tokens = await getTokens();
+      var newAccess = await apiRefresh(tokens.refresh_token);
+      await saveTokens(newAccess, tokens.refresh_token);
+      return apiPredict(title, text, domain);
+    } catch (e) {
+      await clearTokens();
+      showLogin();
+      throw new Error("Session expired. Please log in again.");
+    }
+  }
+
+  var data = await res.json();
+  if (!res.ok) {
+    var msg = (data.validation_errors && data.validation_errors.join(" ")) ||
+              data.error ||
+              ("Server error (" + res.status + ")");
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function apiGetHistory(page, pageSize) {
+  var headers = await getAuthHeader();
+  var res = await fetch(
+    BASE_URL + "/history/?page=" + page + "&page_size=" + pageSize,
+    { headers: headers }
+  );
+  if (res.status === 401) { await clearTokens(); showLogin(); return null; }
+  if (!res.ok) throw new Error("History error (" + res.status + ")");
+  return res.json();
+}
+
+async function apiGetSimilar(title, minSim) {
+  var headers = await getAuthHeader();
+  var params = new URLSearchParams({ title: title, min_sim: minSim });
+  var res = await fetch(BASE_URL + "/similar/?" + params.toString(),
+    { headers: headers });
+  if (res.status === 401) { await clearTokens(); showLogin(); return null; }
+  if (!res.ok) throw new Error("Similar error (" + res.status + ")");
+  return res.json();
+}
+
+async function apiGetSources() {
+  var headers = await getAuthHeader();
+  var res = await fetch(BASE_URL + "/sources/", { headers: headers });
+  if (res.status === 401) { await clearTokens(); showLogin(); return null; }
+  if (!res.ok) throw new Error("Sources error (" + res.status + ")");
+  return res.json();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════════════════════════════════════════════
 
 async function getActiveDomain() {
   try {
@@ -129,7 +411,6 @@ function drawDonut(canvas, realPct, fakePct) {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Real arc (green)
   ctx.beginPath();
   ctx.arc(cx, cy, r, start, start + Math.PI * 2 * realPct);
   ctx.strokeStyle = "#22c55e";
@@ -137,7 +418,6 @@ function drawDonut(canvas, realPct, fakePct) {
   ctx.lineCap = "butt";
   ctx.stroke();
 
-  // Fake arc (red)
   ctx.beginPath();
   ctx.arc(cx, cy, r, start + Math.PI * 2 * realPct, start + Math.PI * 2);
   ctx.strokeStyle = "#ef4444";
@@ -147,54 +427,29 @@ function drawDonut(canvas, realPct, fakePct) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// API
+// FIELD PERSISTENCE
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function apiPredict(title, text, domain, deviceId) {
-  const body = { title: title, text: text, device_id: deviceId };
-  if (domain) body.domain = domain;
-
-  const res = await fetch(BASE_URL + "/predict/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+async function saveFields() {
+  await chrome.storage.local.set({
+    saved_title: state.title,
+    saved_body: state.body,
   });
+}
 
-  const data = await res.json();
-
-  if (!res.ok) {
-    const msg =
-      (data.validation_errors && data.validation_errors.join(" ")) ||
-      data.error ||
-      ("Server error (" + res.status + ")");
-    throw new Error(msg);
+async function loadSavedFields() {
+  const result = await chrome.storage.local.get(["saved_title", "saved_body"]);
+  if (result.saved_title) {
+    state.title = result.saved_title;
+    setBox(boxTitle, result.saved_title);
+    btnRemTitle.classList.remove("hidden");
   }
-
-  return data;
-}
-
-async function apiGetHistory(deviceId, page, pageSize) {
-  const res = await fetch(
-    BASE_URL + "/history/?page=" + page + "&page_size=" + pageSize,
-    { headers: { "X-Device-ID": deviceId } }
-  );
-  if (!res.ok) throw new Error("History error (" + res.status + ")");
-  return res.json();
-}
-
-async function apiGetSimilar(title, minSim) {
-  const params = new URLSearchParams({ title: title, min_sim: minSim });
-  const res = await fetch(BASE_URL + "/similar/?" + params.toString());
-  if (!res.ok) throw new Error("Similar error (" + res.status + ")");
-  return res.json();
-}
-
-async function apiGetSources(deviceId) {
-  const res = await fetch(BASE_URL + "/sources/", {
-    headers: { "X-Device-ID": deviceId },
-  });
-  if (!res.ok) throw new Error("Sources error (" + res.status + ")");
-  return res.json();
+  if (result.saved_body) {
+    state.body = result.saved_body;
+    setBox(boxBody, result.saved_body);
+    btnRemBody.classList.remove("hidden");
+  }
+  updateAnalyzeBtn();
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -211,6 +466,7 @@ function switchTab(tabName) {
 
   if (tabName === "history") loadHistory();
   if (tabName === "sources") loadSources();
+  if (tabName === "similar") loadSimilar(state.similarTitle);  // ← usa similarTitle
 }
 
 tabBtns.forEach(function(btn) {
@@ -255,7 +511,7 @@ async function selectText(field) {
     setBox(boxBody, text);
     btnRemBody.classList.remove("hidden");
   }
-  await saveFields();  // ← guardar tras seleccionar
+  await saveFields();
   updateAnalyzeBtn();
 }
 
@@ -289,11 +545,13 @@ function hideError() {
 }
 
 function showResult(result, title, readMode) {
+  if (readMode) {
+    state.similarTitle = null;
+  }
   state.isReadMode = readMode || false;
   analyzeMode.classList.add("hidden");
   resultMode.classList.remove("hidden");
 
-  // Hide donut chart in read mode when no real confidence is available
   var chartWrapper = document.querySelector(".chart-wrapper");
   if (readMode && !result.probas) {
     chartWrapper.classList.add("hidden");
@@ -303,12 +561,10 @@ function showResult(result, title, readMode) {
 
   var isReal = result.label === "REAL";
 
-  // Verdict badge
   verdictEl.className = "verdict verdict--" + (isReal ? "real" : "fake");
   verdictEl.innerHTML =
     '<div class="verdict__badge">' + (isReal ? "\u2713 REAL" : "\u2717 FAKE") + "</div>";
 
-  // Donut chart
   var realPct = (result.probas && result.probas.REAL != null)
     ? result.probas.REAL
     : (isReal ? result.confidence : 1 - result.confidence);
@@ -319,7 +575,6 @@ function showResult(result, title, readMode) {
   drawDonut(donutCanvas, realPct, fakePct);
   chartPct.textContent = Math.round((isReal ? realPct : fakePct) * 100) + "%";
 
-  // Source
   var src = formatSource(result.news_source);
   if (src.logoUrl) {
     sourceResult.innerHTML =
@@ -331,7 +586,6 @@ function showResult(result, title, readMode) {
       '<span class="source-result__name">' + src.displayName + "</span>";
   }
 
-  // Warnings
   var existingWarning = resultMode.querySelector(".warning-box");
   if (existingWarning) existingWarning.remove();
   if (result.warnings && result.warnings.length) {
@@ -350,7 +604,7 @@ function resetAnalyzeTab() {
   state.title = "";
   state.body = "";
   state.lastResult = null;
-  chrome.storage.local.remove(["saved_title", "saved_body"]);  // ← limpiar
+  state.similarTitle = null;
 
   analyzeMode.classList.remove("hidden");
   resultMode.classList.add("hidden");
@@ -367,7 +621,7 @@ async function runAnalysis() {
   setLoading(true);
   hideError();
   try {
-    var result = await apiPredict(state.title, state.body, state.domain, state.deviceId);
+    var result = await apiPredict(state.title, state.body, state.domain);
     state.lastResult = result;
     showResult(result, state.title, false);
   } catch (err) {
@@ -393,58 +647,67 @@ btnSearchWeb.addEventListener("click", function() {
 });
 
 btnFindSim.addEventListener("click", function() {
+  state.similarTitle = state.title;
   switchTab("similar");
-  loadSimilar(state.title);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TAB 2 — HISTORY
 // ══════════════════════════════════════════════════════════════════════════════
 
-histPrev.addEventListener("click", function() {
-  if (state.historyPage > 1) {
-    state.historyPage--;
-    loadHistory();
-  }
-});
-
-histNext.addEventListener("click", function() {
-  if (state.historyPage < state.historyTotalPages) {
-    state.historyPage++;
-    loadHistory();
-  }
-});
-
 async function loadHistory() {
   historyList.innerHTML = "";
   histEmpty.classList.add("hidden");
   histPag.classList.add("hidden");
+  $("history-no-results").classList.add("hidden");
+  allHistoryItems = [];
+  historyCurrentPage = 1;
+  $("filter-history-label").value = "";
+  $("filter-history-source").value = "";
 
   try {
-    var data = await apiGetHistory(state.deviceId, state.historyPage, PAGE_SIZE);
-    state.historyTotalPages = data.total_pages;
+    var first = await apiGetHistory(1, 50);
+    if (!first) return;
 
-    if (!data.results.length) {
-      histEmpty.classList.remove("hidden");
-      return;
+    allHistoryItems = first.results;
+
+    if (first.total_pages > 1) {
+      var promises = [];
+      for (var p = 2; p <= first.total_pages; p++) {
+        promises.push(apiGetHistory(p, 50));
+      }
+      var rest = await Promise.all(promises);
+      rest.forEach(function(page) {
+        if (page) allHistoryItems = allHistoryItems.concat(page.results);
+      });
     }
 
-    data.results.forEach(function(check) {
-      historyList.appendChild(buildNewsCard(check));
+    // Build source dropdown
+    var select = $("filter-history-source");
+    while (select.options.length > 1) select.remove(1);
+    var domains = {};
+    allHistoryItems.forEach(function(item) {
+      if (item.news_source && item.news_source.domain) {
+        domains[item.news_source.domain] = item.news_source.name || item.news_source.domain;
+      }
+    });
+    Object.keys(domains).sort().forEach(function(domain) {
+      var opt = document.createElement("option");
+      opt.value = domain;
+      opt.textContent = domains[domain];
+      select.appendChild(opt);
     });
 
-    if (data.total_pages > 1) {
-      histPag.classList.remove("hidden");
-      histPageInfo.textContent = state.historyPage + " / " + data.total_pages;
-      histPrev.disabled = state.historyPage <= 1;
-      histNext.disabled = state.historyPage >= data.total_pages;
+    if (allHistoryItems.length > 0) {
+      $("history-filters").classList.remove("hidden");
     }
+
+    renderHistoryPage();
+
   } catch (err) {
     historyList.innerHTML =
-      '<div class="empty-state">' +
-        '<span>⚠️</span>' +
-        '<p>Could not connect to the server.<br>Make sure the app is running and try again.</p>' +
-      '</div>';
+      '<div class="empty-state"><span>⚠️</span>' +
+      '<p>Could not connect to the server.<br>Make sure the app is running and try again.</p></div>';
   }
 }
 
@@ -456,7 +719,13 @@ async function loadSimilar(title) {
   similarList.innerHTML = "";
   similarEmpty.classList.add("hidden");
   similarNone.classList.add("hidden");
+  $("similar-no-results").classList.add("hidden");
+  $("similar-filters").classList.add("hidden");
+  $("similar-pagination").classList.add("hidden");
+  $("filter-similar-label").value = "";
   simQueryTitle.textContent = "";
+  allSimilarItems = [];
+  similarCurrentPage = 1;
 
   if (!title) {
     similarNone.classList.remove("hidden");
@@ -467,28 +736,21 @@ async function loadSimilar(title) {
 
   try {
     var items = await apiGetSimilar(title, 0.25);
+    if (!items) return;
 
     if (!items.length) {
       similarEmpty.classList.remove("hidden");
       return;
     }
 
-    items.forEach(function(item) {
-      var pseudo = {
-        title: item.title,
-        label: item.label,
-        news_source: item.source_name
-          ? { name: item.source_name, domain: null, logo_url: item.source_logo }
-          : null,
-      };
-      similarList.appendChild(buildNewsCard(pseudo));
-    });
+    allSimilarItems = items;
+    $("similar-filters").classList.remove("hidden");
+    renderSimilarPage();
+
   } catch (err) {
     similarList.innerHTML =
-      '<div class="empty-state">' +
-        '<span>⚠️</span>' +
-        '<p>Could not connect to the server.<br>Make sure the app is running and try again.</p>' +
-      '</div>';
+      '<div class="empty-state"><span>⚠️</span>' +
+      '<p>Could not connect to the server.<br>Make sure the app is running and try again.</p></div>';
   }
 }
 
@@ -501,7 +763,8 @@ async function loadSources() {
   sourcesEmpty.classList.add("hidden");
 
   try {
-    var sources = await apiGetSources(state.deviceId);
+    var sources = await apiGetSources();
+    if (!sources) return;
 
     if (!sources.length) {
       sourcesEmpty.classList.remove("hidden");
@@ -510,16 +773,13 @@ async function loadSources() {
 
     var slots = sources.slice();
     while (slots.length < 5) slots.push(null);
-
     slots.forEach(function(src, i) {
       podiumEl.appendChild(buildPodiumSlot(src, i + 1));
     });
   } catch (err) {
     podiumEl.innerHTML =
-      '<div class="empty-state">' +
-        '<span>⚠️</span>' +
-        '<p>Could not connect to the server.<br>Make sure the app is running and try again.</p>' +
-      '</div>';
+      '<div class="empty-state"><span>⚠️</span>' +
+      '<p>Could not connect to the server.<br>Make sure the app is running and try again.</p></div>';
   }
 }
 
@@ -551,6 +811,7 @@ function buildNewsCard(check) {
     "</div>";
 
   card.addEventListener("click", function() {
+    state.similarTitle = null;
     switchTab("analyze");
     showResult(check, check.title, true);
   });
@@ -598,38 +859,173 @@ function buildPodiumSlot(src, position) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// INIT
+// FILTERS
 // ══════════════════════════════════════════════════════════════════════════════
 
-async function init() {
-  state.deviceId = await getOrCreateDeviceId();
-  state.domain   = await getActiveDomain();
-  await loadSavedFields();  // ← restaurar título y body
-  renderSourcePending();
-}
+var allHistoryItems = [];
+var allSimilarItems = [];
+var historyCurrentPage = 1;
+var similarCurrentPage = 1;
+const ITEMS_PER_PAGE = 3;
 
-init();
-
-// ── Persistencia de título y body ───────────────────────────────────────────
-
-async function saveFields() {
-  await chrome.storage.local.set({
-    saved_title: state.title,
-    saved_body: state.body,
+function getHistoryFiltered() {
+  var labelFilter  = $("filter-history-label").value;
+  var sourceFilter = $("filter-history-source").value;
+  return allHistoryItems.filter(function(item) {
+    var matchLabel  = !labelFilter  || item.label === labelFilter;
+    var matchSource = !sourceFilter ||
+      (item.news_source && item.news_source.domain === sourceFilter);
+    return matchLabel && matchSource;
   });
 }
 
-async function loadSavedFields() {
-  const result = await chrome.storage.local.get(["saved_title", "saved_body"]);
-  if (result.saved_title) {
-    state.title = result.saved_title;
-    setBox(boxTitle, result.saved_title);
-    btnRemTitle.classList.remove("hidden");
+function renderHistoryPage() {
+  historyList.innerHTML = "";
+  $("history-no-results").classList.add("hidden");
+  histEmpty.classList.add("hidden");
+  histPag.classList.add("hidden");
+
+  var filtered = getHistoryFiltered();
+
+  if (!filtered.length) {
+    var lf = $("filter-history-label").value;
+    var sf = $("filter-history-source").value;
+    if (lf || sf) {
+      $("history-no-results").classList.remove("hidden");
+    } else {
+      histEmpty.classList.remove("hidden");
+    }
+    return;
   }
-  if (result.saved_body) {
-    state.body = result.saved_body;
-    setBox(boxBody, result.saved_body);
-    btnRemBody.classList.remove("hidden");
+
+  var totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  if (historyCurrentPage > totalPages) historyCurrentPage = 1;
+
+  var start = (historyCurrentPage - 1) * ITEMS_PER_PAGE;
+  filtered.slice(start, start + ITEMS_PER_PAGE).forEach(function(check) {
+    historyList.appendChild(buildNewsCard(check));
+  });
+
+  if (totalPages > 1) {
+    histPag.classList.remove("hidden");
+    histPageInfo.textContent = historyCurrentPage + " / " + totalPages;
+    histPrev.disabled = historyCurrentPage <= 1;
+    histNext.disabled = historyCurrentPage >= totalPages;
   }
-  updateAnalyzeBtn();
 }
+
+function getSimilarFiltered() {
+  var labelFilter = $("filter-similar-label").value;
+  return allSimilarItems.filter(function(item) {
+    return !labelFilter || item.label === labelFilter;
+  });
+}
+
+function renderSimilarPage() {
+  similarList.innerHTML = "";
+  $("similar-no-results").classList.add("hidden");
+  similarEmpty.classList.add("hidden");
+  $("similar-pagination").classList.add("hidden");
+
+  var filtered = getSimilarFiltered();
+
+  if (!filtered.length) {
+    if ($("filter-similar-label").value) {
+      $("similar-no-results").classList.remove("hidden");
+    } else {
+      similarEmpty.classList.remove("hidden");
+    }
+    return;
+  }
+
+  var totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  if (similarCurrentPage > totalPages) similarCurrentPage = 1;
+
+  var start = (similarCurrentPage - 1) * ITEMS_PER_PAGE;
+  filtered.slice(start, start + ITEMS_PER_PAGE).forEach(function(item) {
+    var pseudo = {
+      title: item.title,
+      label: item.label,
+      news_source: item.source_name
+        ? { name: item.source_name, domain: null, logo_url: item.source_logo }
+        : null,
+    };
+    similarList.appendChild(buildNewsCard(pseudo));
+  });
+
+  if (totalPages > 1) {
+    $("similar-pagination").classList.remove("hidden");
+    $("similar-page-info").textContent = similarCurrentPage + " / " + totalPages;
+    $("similar-prev").disabled = similarCurrentPage <= 1;
+    $("similar-next").disabled = similarCurrentPage >= totalPages;
+  }
+}
+
+// Filter listeners — history
+$("filter-history-label").addEventListener("change", function() {
+  historyCurrentPage = 1;
+  renderHistoryPage();
+});
+$("filter-history-source").addEventListener("change", function() {
+  historyCurrentPage = 1;
+  renderHistoryPage();
+});
+$("btn-clear-history-filters").addEventListener("click", function() {
+  $("filter-history-label").value = "";
+  $("filter-history-source").value = "";
+  historyCurrentPage = 1;
+  renderHistoryPage();
+});
+
+// Pagination listeners — history
+histPrev.removeEventListener("click", histPrev._handler);
+histNext.removeEventListener("click", histNext._handler);
+histPrev.addEventListener("click", function() {
+  if (historyCurrentPage > 1) { historyCurrentPage--; renderHistoryPage(); }
+});
+histNext.addEventListener("click", function() {
+  var total = Math.ceil(getHistoryFiltered().length / ITEMS_PER_PAGE);
+  if (historyCurrentPage < total) { historyCurrentPage++; renderHistoryPage(); }
+});
+
+// Filter listeners — similar
+$("filter-similar-label").addEventListener("change", function() {
+  similarCurrentPage = 1;
+  renderSimilarPage();
+});
+$("btn-clear-similar-filters").addEventListener("click", function() {
+  $("filter-similar-label").value = "";
+  similarCurrentPage = 1;
+  renderSimilarPage();
+});
+
+// Pagination listeners — similar
+$("similar-prev").addEventListener("click", function() {
+  if (similarCurrentPage > 1) { similarCurrentPage--; renderSimilarPage(); }
+});
+$("similar-next").addEventListener("click", function() {
+  var total = Math.ceil(getSimilarFiltered().length / ITEMS_PER_PAGE);
+  if (similarCurrentPage < total) { similarCurrentPage++; renderSimilarPage(); }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════════════════════
+
+async function initApp() {
+  state.domain = await getActiveDomain();
+  await loadSavedFields();
+  renderSourcePending();
+}
+
+async function init() {
+  var tokens = await getTokens();
+  if (tokens.access_token) {
+    await initApp();
+    showApp();
+  } else {
+    showLogin();
+  }
+}
+
+init();

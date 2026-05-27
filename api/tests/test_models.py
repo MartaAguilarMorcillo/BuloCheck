@@ -1,23 +1,24 @@
 """
-test_models.py — Model tests for AnonymousUser and NewsCheck.
+test_models.py — Model tests for User and NewsCheck.
 """
 
-import uuid
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 
-from api.models import AnonymousUser, NewsCheck
+from api.models import NewsCheck
 
-DEVICE_ID = "550e8400-e29b-41d4-a716-446655440000"
+User = get_user_model()
+
 SAMPLE_TITLE = "Scientists confirm the Earth is flat"
 SAMPLE_TEXT = "A new NASA study reveals the Earth has been flat all along."
 
 
-def make_user(device_id=DEVICE_ID):
-    return AnonymousUser.objects.create(id=device_id)
+def make_user(email="test@example.com", password="testpass123"):
+    return User.objects.create_user(email=email, password=password)
 
 
 def make_check(
@@ -39,13 +40,33 @@ def make_check(
     return check
 
 
-class AnonymousUserModelTest(TestCase):
-    """Tests for the AnonymousUser model."""
+# ─────────────────────────────────────────────────────────────────────────────
+# User model
+# ─────────────────────────────────────────────────────────────────────────────
 
-    def test_create_user_with_uuid(self):
-        """AnonymousUser is created with a valid UUID."""
+
+class UserModelTest(TestCase):
+
+    def test_create_user_with_email(self):
+        """User is created with email as identifier."""
         user = make_user()
-        self.assertEqual(str(user.id), DEVICE_ID)
+        self.assertEqual(user.email, "test@example.com")
+
+    def test_password_is_hashed(self):
+        """Password is stored hashed, never in plain text."""
+        user = make_user()
+        self.assertNotEqual(user.password, "testpass123")
+        self.assertTrue(user.check_password("testpass123"))
+
+    def test_user_is_active_by_default(self):
+        """User is active by default."""
+        user = make_user()
+        self.assertTrue(user.is_active)
+
+    def test_user_is_not_staff_by_default(self):
+        """User is not staff by default."""
+        user = make_user()
+        self.assertFalse(user.is_staff)
 
     def test_user_created_at_is_set(self):
         """created_at is automatically set on creation."""
@@ -53,28 +74,31 @@ class AnonymousUserModelTest(TestCase):
         self.assertIsNotNone(user.created_at)
 
     def test_str_representation(self):
-        """__str__ returns the UUID as string."""
+        """__str__ returns the email."""
         user = make_user()
-        self.assertEqual(str(user), DEVICE_ID)
+        self.assertEqual(str(user), "test@example.com")
 
-    def test_user_uuid_is_primary_key(self):
-        """UUID is the primary key."""
-        user = make_user()
-        self.assertEqual(str(user.pk), DEVICE_ID)
-
-    def test_duplicate_device_id_raises_error(self):
-        """Creating two users with the same device_id raises IntegrityError."""
+    def test_duplicate_email_raises_error(self):
+        """Creating two users with the same email raises IntegrityError."""
         make_user()
         with self.assertRaises(IntegrityError):
-            AnonymousUser.objects.create(id=DEVICE_ID)
+            User.objects.create_user(email="test@example.com", password="pass123")
 
     def test_db_table_name(self):
         """Model uses the correct DB table name."""
-        self.assertEqual(AnonymousUser._meta.db_table, "anonymous_users")
+        self.assertEqual(User._meta.db_table, "users")
+
+    def test_username_field_is_email(self):
+        """USERNAME_FIELD is set to email."""
+        self.assertEqual(User.USERNAME_FIELD, "email")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# NewsCheck model
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 class NewsCheckModelTest(TestCase):
-    """Tests for the NewsCheck model."""
 
     def setUp(self):
         self.user = make_user()
@@ -95,17 +119,14 @@ class NewsCheckModelTest(TestCase):
         self.assertIsNone(check.news_source)
 
     def test_label_real(self):
-        """Label can be set to REAL."""
         check = make_check(self.user, label="REAL")
         self.assertEqual(check.label, "REAL")
 
     def test_label_fake(self):
-        """Label can be set to FAKE."""
         check = make_check(self.user, label="FAKE")
         self.assertEqual(check.label, "FAKE")
 
     def test_str_representation(self):
-        """__str__ returns label, confidence and truncated title."""
         check = make_check(self.user, label="FAKE", confidence=0.9)
         self.assertIn("FAKE", str(check))
         self.assertIn("90%", str(check))
@@ -129,23 +150,20 @@ class NewsCheckModelTest(TestCase):
         make_check(self.user)
         self.assertEqual(NewsCheck.objects.count(), 2)
         self.user.delete()
-        # NewsChecks still exist but are no longer linked to the deleted user
         self.assertEqual(NewsCheck.objects.count(), 2)
         for check in NewsCheck.objects.all():
             self.assertEqual(check.users.count(), 0)
 
     def test_db_table_name(self):
-        """Model uses the correct DB table name."""
         self.assertEqual(NewsCheck._meta.db_table, "news_checks")
 
     def test_user_relation(self):
-        """NewsCheck is linked to the correct AnonymousUser."""
+        """NewsCheck is linked to the correct User."""
         check = make_check(self.user)
-        user_ids = check.users.values_list("id", flat=True)
-        self.assertIn(uuid.UUID(str(self.user.id)), user_ids)
+        self.assertIn(self.user, check.users.all())
 
     def test_related_name_checks(self):
-        """AnonymousUser.checks returns all related NewsChecks."""
+        """User.checks returns all related NewsChecks."""
         make_check(self.user)
         make_check(self.user)
         self.assertEqual(self.user.checks.count(), 2)
