@@ -1,17 +1,10 @@
 """
 test_validators.py — Unit tests for api/validators.py.
-
-Tests cover all validation rules:
-  - Empty / whitespace-only text
-  - Length bounds (too short, too long)
-  - Real words ratio (rejects gibberish and symbol-only text)
-  - Repetitive text
-  - Language detection (warning, not error)
-  - Combined validate_title and validate_body helpers
 """
 
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -26,7 +19,7 @@ from api.validators import (
     validate_title,
 )
 
-DEVICE_ID = "550e8400-e29b-41d4-a716-446655440000"
+User = get_user_model()
 
 VALID_TITLE = "Scientists discover new vaccine that could cure all diseases"
 VALID_BODY = (
@@ -84,8 +77,7 @@ class ValidateLengthTest(TestCase):
         )
 
     def test_valid_length(self):
-        result = self._validate(VALID_TITLE)
-        self.assertTrue(result.is_valid)
+        self.assertTrue(self._validate(VALID_TITLE).is_valid)
 
     def test_too_short_chars(self):
         result = self._validate("Hi")
@@ -93,23 +85,20 @@ class ValidateLengthTest(TestCase):
         self.assertTrue(any("too short" in e for e in result.errors))
 
     def test_too_few_words(self):
-        result = self._validate("Breaking news today")
-        # 3 words is exactly the minimum — should be valid
-        self.assertTrue(result.is_valid)
+        self.assertTrue(self._validate("Breaking news today").is_valid)
 
     def test_exactly_two_words_invalid(self):
-        result = self._validate("Breaking news is happening right now ok")
-        self.assertTrue(result.is_valid)
+        self.assertTrue(
+            self._validate("Breaking news is happening right now ok").is_valid
+        )
 
     def test_too_long_chars(self):
-        long_text = "word " * 100  # 500 chars
-        result = self._validate(long_text)
+        result = self._validate("word " * 100)
         self.assertFalse(result.is_valid)
         self.assertTrue(any("too long" in e for e in result.errors))
 
     def test_too_many_words(self):
-        long_title = " ".join(["word"] * 35)
-        result = self._validate(long_title)
+        result = self._validate(" ".join(["word"] * 35))
         self.assertFalse(result.is_valid)
         self.assertTrue(any("too many words" in e for e in result.errors))
 
@@ -122,29 +111,30 @@ class ValidateLengthTest(TestCase):
 class ValidateRealWordsTest(TestCase):
 
     def test_valid_english_text(self):
-        result = validate_real_words(VALID_TITLE, "Title")
-        self.assertTrue(result.is_valid)
+        self.assertTrue(validate_real_words(VALID_TITLE, "Title").is_valid)
 
     def test_numbers_only(self):
-        result = validate_real_words("1234 5678 9012 3456", "Title")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_real_words("1234 5678 9012 3456", "Title").is_valid)
 
     def test_symbols_only(self):
-        result = validate_real_words("!!! ??? ### $$$ @@@", "Title")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_real_words("!!! ??? ### $$$ @@@", "Title").is_valid)
 
     def test_mixed_gibberish(self):
-        result = validate_real_words("1234 &%()! dsdjfncfef 9999 @@@@", "Title")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(
+            validate_real_words("1234 &%()! dsdjfncfef 9999 @@@@", "Title").is_valid
+        )
 
     def test_mostly_numbers_with_some_words(self):
-        result = validate_real_words("123 456 789 hello 000 111 222", "Title")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(
+            validate_real_words("123 456 789 hello 000 111 222", "Title").is_valid
+        )
 
     def test_text_with_some_numbers_is_valid(self):
-        # Real news titles often contain numbers
-        result = validate_real_words("Trump wins 2024 election by 5 points", "Title")
-        self.assertTrue(result.is_valid)
+        self.assertTrue(
+            validate_real_words(
+                "Trump wins 2024 election by 5 points", "Title"
+            ).is_valid
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -155,8 +145,7 @@ class ValidateRealWordsTest(TestCase):
 class ValidateNotRepetitiveTest(TestCase):
 
     def test_valid_normal_text(self):
-        result = validate_not_repetitive(VALID_TITLE, "Title")
-        self.assertTrue(result.is_valid)
+        self.assertTrue(validate_not_repetitive(VALID_TITLE, "Title").is_valid)
 
     def test_same_word_8_times(self):
         result = validate_not_repetitive(
@@ -166,22 +155,25 @@ class ValidateNotRepetitiveTest(TestCase):
         self.assertTrue(any("repetitive" in e for e in result.errors))
 
     def test_same_word_10_times(self):
-        result = validate_not_repetitive(" ".join(["test"] * 10), "Title")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(
+            validate_not_repetitive(" ".join(["test"] * 10), "Title").is_valid
+        )
 
     def test_same_word_3_times_is_ok(self):
-        # 3 repetitions out of a long text is fine
-        result = validate_not_repetitive(
-            "the president the government the people voted for change today", "Title"
+        self.assertTrue(
+            validate_not_repetitive(
+                "the president the government the people voted for change today",
+                "Title",
+            ).is_valid
         )
-        self.assertTrue(result.is_valid)
 
     def test_word_repeated_just_below_threshold(self):
-        # 3 repetitions in a 10-word text = 30% — below the 40% threshold
-        result = validate_not_repetitive(
-            "the news today is big the story broke the journalists reported it", "Title"
+        self.assertTrue(
+            validate_not_repetitive(
+                "the news today is big the story broke the journalists reported it",
+                "Title",
+            ).is_valid
         )
-        self.assertTrue(result.is_valid)
 
     def test_error_message_contains_word(self):
         result = validate_not_repetitive(" ".join(["spam"] * 8), "Title")
@@ -205,7 +197,7 @@ class ValidateLanguageTest(TestCase):
         result = validate_language(
             "El presidente anunció nuevas medidas económicas hoy", "Title"
         )
-        self.assertTrue(result.is_valid)  # valid — not blocked
+        self.assertTrue(result.is_valid)
         self.assertTrue(len(result.warnings) > 0)
 
     def test_french_text_gives_warning(self):
@@ -230,41 +222,34 @@ class ValidateLanguageTest(TestCase):
         self.assertTrue(any("English" in w for w in result.warnings))
 
     def test_non_english_is_not_blocked(self):
-        """Non-English text should produce a warning, not an error."""
         result = validate_language("texto en español aquí", "Title")
         self.assertEqual(len(result.errors), 0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# validate_title (combined)
+# validate_title / validate_body (combined)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 class ValidateTitleTest(TestCase):
 
     def test_valid_title(self):
-        result = validate_title(VALID_TITLE)
-        self.assertTrue(result.is_valid)
+        self.assertTrue(validate_title(VALID_TITLE).is_valid)
 
     def test_empty_title(self):
-        result = validate_title("")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_title("").is_valid)
 
     def test_whitespace_title(self):
-        result = validate_title("   ")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_title("   ").is_valid)
 
     def test_too_short_title(self):
-        result = validate_title("Hi")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_title("Hi").is_valid)
 
     def test_gibberish_title(self):
-        result = validate_title("1234 &%()! dsdjfncfef 9999")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_title("1234 &%()! dsdjfncfef 9999").is_valid)
 
     def test_repetitive_title(self):
-        result = validate_title(" ".join(["fake"] * 8))
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_title(" ".join(["fake"] * 8)).is_valid)
 
     def test_non_english_title_gives_warning(self):
         result = validate_title(
@@ -274,32 +259,24 @@ class ValidateTitleTest(TestCase):
         self.assertTrue(len(result.warnings) > 0)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# validate_body (combined)
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 class ValidateBodyTest(TestCase):
 
     def test_valid_body(self):
-        result = validate_body(VALID_BODY)
-        self.assertTrue(result.is_valid)
+        self.assertTrue(validate_body(VALID_BODY).is_valid)
 
     def test_empty_body(self):
-        result = validate_body("")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_body("").is_valid)
 
     def test_too_short_body(self):
-        result = validate_body("Short text")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_body("Short text").is_valid)
 
     def test_gibberish_body(self):
-        result = validate_body("1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000")
-        self.assertFalse(result.is_valid)
+        self.assertFalse(
+            validate_body("1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000").is_valid
+        )
 
     def test_repetitive_body(self):
-        result = validate_body(" ".join(["word"] * 20))
-        self.assertFalse(result.is_valid)
+        self.assertFalse(validate_body(" ".join(["word"] * 20)).is_valid)
 
     def test_non_english_body_gives_warning(self):
         result = validate_body(
@@ -317,52 +294,32 @@ class ValidateBodyTest(TestCase):
 
 
 class PredictValidationAPITest(APITestCase):
-    """
-    Tests that /api/predict/ returns 422 for invalid content
-    and 200 with warnings for non-English text.
-    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="test@example.com", password="testpass123"
+        )
+        self.client.force_authenticate(user=self.user)
 
     def _post(self, data):
         return self.client.post("/api/predict/", data, format="json")
 
     def test_empty_title_returns_422(self):
-        response = self._post(
-            {
-                "title": "",
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": "", "text": VALID_BODY})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
         self.assertIn("validation_errors", response.json())
 
     def test_whitespace_title_returns_422(self):
-        response = self._post(
-            {
-                "title": "          ",
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": "          ", "text": VALID_BODY})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_too_short_title_returns_422(self):
-        response = self._post(
-            {
-                "title": "Hi",
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": "Hi", "text": VALID_BODY})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_gibberish_title_returns_422(self):
         response = self._post(
-            {
-                "title": "1234 &%()! dsdjfncfef 9999 @@@@",
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
+            {"title": "1234 &%()! dsdjfncfef 9999 @@@@", "text": VALID_BODY}
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
@@ -371,29 +328,16 @@ class PredictValidationAPITest(APITestCase):
             {
                 "title": "example example example example example example example example",
                 "text": VALID_BODY,
-                "device_id": DEVICE_ID,
             }
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_empty_body_returns_422(self):
-        response = self._post(
-            {
-                "title": VALID_TITLE,
-                "text": "",
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": VALID_TITLE, "text": ""})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_too_short_body_returns_422(self):
-        response = self._post(
-            {
-                "title": VALID_TITLE,
-                "text": "Too short.",
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": VALID_TITLE, "text": "Too short."})
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_gibberish_body_returns_422(self):
@@ -401,41 +345,25 @@ class PredictValidationAPITest(APITestCase):
             {
                 "title": VALID_TITLE,
                 "text": "1234 5678 &%()! ### $$$ @@@ !!! ??? 9999 0000 %%%",
-                "device_id": DEVICE_ID,
             }
         )
         self.assertEqual(response.status_code, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
     def test_validation_errors_in_response(self):
-        """422 response contains a list of validation_errors."""
-        response = self._post(
-            {
-                "title": "",
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": "", "text": VALID_BODY})
         data = response.json()
         self.assertIn("validation_errors", data)
         self.assertIsInstance(data["validation_errors"], list)
         self.assertTrue(len(data["validation_errors"]) > 0)
 
     def test_invalid_content_is_not_saved_to_db(self):
-        """422 responses must not save anything to the database."""
         from api.models import NewsCheck
 
-        self._post(
-            {
-                "title": "bad",
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
-        )
+        self._post({"title": "bad", "text": VALID_BODY})
         self.assertEqual(NewsCheck.objects.count(), 0)
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_non_english_returns_200_with_warning(self, _):
-        """Non-English text returns 200 but includes a warnings field."""
         response = self._post(
             {
                 "title": "El presidente anuncia nuevas medidas económicas para el país hoy",
@@ -444,7 +372,6 @@ class PredictValidationAPITest(APITestCase):
                     "para hacer frente a la crisis. El presidente compareció ante los "
                     "medios de comunicación para explicar el nuevo plan de acción nacional."
                 ),
-                "device_id": DEVICE_ID,
             }
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -455,14 +382,6 @@ class PredictValidationAPITest(APITestCase):
 
     @patch("api.views.predict_news", return_value=MOCK_PREDICTION)
     def test_valid_english_text_has_no_warnings(self, _):
-        """Valid English text returns 200 without warnings field."""
-        response = self._post(
-            {
-                "title": VALID_TITLE,
-                "text": VALID_BODY,
-                "device_id": DEVICE_ID,
-            }
-        )
+        response = self._post({"title": VALID_TITLE, "text": VALID_BODY})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        data = response.json()
-        self.assertNotIn("warnings", data)
+        self.assertNotIn("warnings", response.json())

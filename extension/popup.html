@@ -8,13 +8,84 @@
 </head>
 <body>
 
-  <!-- ── Header ────────────────────────────────────────────────────── -->
+<!-- ── Auth screens ───────────────────────────────────────────────── -->
+  <div id="auth-screen">
+
+    <!-- Login -->
+    <div id="login-screen">
+      <div class="auth-header">
+        <img src="icons/icon48.png" alt="BuloCheck" class="auth-icon" />
+        <h1 class="auth-title">BuloCheck</h1>
+        <p class="auth-subtitle">Fake News Detector</p>
+      </div>
+      <div class="auth-form">
+        <div class="auth-field">
+          <label class="auth-label">Email</label>
+          <input type="email" id="login-email" class="auth-input"
+                 placeholder="your@email.com" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Password</label>
+          <input type="password" id="login-password" class="auth-input"
+                 placeholder="••••••••" />
+        </div>
+        <div class="auth-error hidden" id="login-error"></div>
+        <button class="btn btn--primary btn--full" id="btn-login">
+          Log in
+        </button>
+        <p class="auth-switch">
+          Don't have an account?
+          <a href="#" id="link-to-register">Create account</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Register -->
+    <div id="register-screen" class="hidden">
+      <div class="auth-header">
+        <img src="icons/icon48.png" alt="BuloCheck" class="auth-icon" />
+        <h1 class="auth-title">BuloCheck</h1>
+        <p class="auth-subtitle">Create your account</p>
+      </div>
+      <div class="auth-form">
+        <div class="auth-field">
+          <label class="auth-label">Email</label>
+          <input type="email" id="register-email" class="auth-input"
+                 placeholder="your@email.com" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Password</label>
+          <input type="password" id="register-password" class="auth-input"
+                 placeholder="Min. 8 characters" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label">Confirm password</label>
+          <input type="password" id="register-password2" class="auth-input"
+                 placeholder="••••••••" />
+        </div>
+        <div class="auth-error hidden" id="register-error"></div>
+        <button class="btn btn--primary btn--full" id="btn-register">
+          Create account
+        </button>
+        <p class="auth-switch">
+          Already have an account?
+          <a href="#" id="link-to-login">Log in</a>
+        </p>
+      </div>
+    </div>
+
+  </div><!-- /auth-screen -->
+
+  <!-- ── Main app (hidden until authenticated) ──────────────────────── -->
+  <div id="app-screen" class="hidden">
+
+<!-- ── Header ────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="header__logo">
       <img src="icons/icon48.png" alt="BuloCheck" class="header__icon" />
       <span class="header__title">BuloCheck</span>
     </div>
-    <span class="header__tagline">Fake News Detector</span>
+    <button class="btn--logout" id="btn-logout" title="Log out">⏻</button>  <!-- ← sustituye el span -->
   </header>
 
   <!-- ── Tab navigation ────────────────────────────────────────────── -->
@@ -138,52 +209,82 @@
 
   </section>
 
-  <!-- ── Tab 2: History ────────────────────────────────────────────── -->
+  <!-- ── Tab 2: History ───────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-history">
-
     <div class="tab-panel__header">
       <h2 class="tab-panel__title">Your history</h2>
     </div>
 
-    <div id="history-list" class="news-list">
-      <!-- Injected by JS -->
+    <!-- Filters -->
+    <div class="filters" id="history-filters">
+      <select class="filter-select" id="filter-history-label">
+        <option value="">All labels</option>
+        <option value="REAL">✓ REAL</option>
+        <option value="FAKE">✗ FAKE</option>
+      </select>
+      <select class="filter-select" id="filter-history-source">
+        <option value="">All sources</option>
+      </select>
+      <button class="btn btn--ghost btn--sm" id="btn-clear-history-filters">
+        Clear
+      </button>
     </div>
 
+    <div id="history-list" class="news-list"></div>
     <div class="pagination hidden" id="history-pagination">
       <button class="btn btn--ghost btn--sm" id="history-prev">← Prev</button>
       <span id="history-page-info"></span>
       <button class="btn btn--ghost btn--sm" id="history-next">Next →</button>
     </div>
-
     <div class="empty-state hidden" id="history-empty">
       <span>📭</span>
       <p>You haven't analyzed any news yet.</p>
     </div>
-
+    <div class="empty-state hidden" id="history-no-results">
+      <span>🔍</span>
+      <p>No news matches the selected filters.</p>
+    </div>
   </section>
-
-  <!-- ── Tab 3: Similar ─────────────────────────────────────────────── -->
+  
+  <!-- ── Tab 3: Similar ───────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-similar">
-
     <div class="tab-panel__header">
       <h2 class="tab-panel__title">Similar news</h2>
       <p class="tab-panel__subtitle" id="similar-query-title"></p>
     </div>
 
-    <div id="similar-list" class="news-list">
-      <!-- Injected by JS -->
+    <!-- Filter -->
+    <div class="filters hidden" id="similar-filters">
+      <select class="filter-select" id="filter-similar-label">
+        <option value="">All labels</option>
+        <option value="REAL">✓ REAL</option>
+        <option value="FAKE">✗ FAKE</option>
+      </select>
+      <button class="btn btn--ghost btn--sm" id="btn-clear-similar-filters">
+        Clear
+      </button>
     </div>
 
+    <div id="similar-list" class="news-list"></div>
+
+    <div class="pagination hidden" id="similar-pagination">
+      <button class="btn btn--ghost btn--sm" id="similar-prev">← Prev</button>
+      <span id="similar-page-info"></span>
+      <button class="btn btn--ghost btn--sm" id="similar-next">Next →</button>
+    </div>
+    
     <div class="empty-state hidden" id="similar-empty">
       <span>🔍</span>
       <p>No similar news items were found in our system.</p>
     </div>
-
+    <div class="empty-state hidden" id="similar-no-results">
+      <span>🔍</span>
+      <p>No similar news matches the selected filter.</p>
+    </div>
     <div class="empty-state hidden" id="similar-no-title">
       <span>⚠️</span>
       <p>Analyze a news article first to find similar ones.</p>
     </div>
-
   </section>
 
   <!-- ── Tab 4: Sources ─────────────────────────────────────────────── -->
@@ -204,6 +305,8 @@
     </div>
 
   </section>
+
+  </div>
 
   <script src="popup.js"></script>
 </body>
