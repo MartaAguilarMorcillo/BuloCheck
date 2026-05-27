@@ -209,52 +209,82 @@
 
   </section>
 
-  <!-- ── Tab 2: History ────────────────────────────────────────────── -->
+  <!-- ── Tab 2: History ───────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-history">
-
     <div class="tab-panel__header">
       <h2 class="tab-panel__title">Your history</h2>
     </div>
 
-    <div id="history-list" class="news-list">
-      <!-- Injected by JS -->
+    <!-- Filters -->
+    <div class="filters" id="history-filters">
+      <select class="filter-select" id="filter-history-label">
+        <option value="">All labels</option>
+        <option value="REAL">✓ REAL</option>
+        <option value="FAKE">✗ FAKE</option>
+      </select>
+      <select class="filter-select" id="filter-history-source">
+        <option value="">All sources</option>
+      </select>
+      <button class="btn btn--ghost btn--sm" id="btn-clear-history-filters">
+        Clear
+      </button>
     </div>
 
+    <div id="history-list" class="news-list"></div>
     <div class="pagination hidden" id="history-pagination">
       <button class="btn btn--ghost btn--sm" id="history-prev">← Prev</button>
       <span id="history-page-info"></span>
       <button class="btn btn--ghost btn--sm" id="history-next">Next →</button>
     </div>
-
     <div class="empty-state hidden" id="history-empty">
       <span>📭</span>
       <p>You haven't analyzed any news yet.</p>
     </div>
-
+    <div class="empty-state hidden" id="history-no-results">
+      <span>🔍</span>
+      <p>No news matches the selected filters.</p>
+    </div>
   </section>
-
-  <!-- ── Tab 3: Similar ─────────────────────────────────────────────── -->
+  
+  <!-- ── Tab 3: Similar ───────────────────────────────────────────────── -->
   <section class="tab-panel" id="tab-similar">
-
     <div class="tab-panel__header">
       <h2 class="tab-panel__title">Similar news</h2>
       <p class="tab-panel__subtitle" id="similar-query-title"></p>
     </div>
 
-    <div id="similar-list" class="news-list">
-      <!-- Injected by JS -->
+    <!-- Filter -->
+    <div class="filters hidden" id="similar-filters">
+      <select class="filter-select" id="filter-similar-label">
+        <option value="">All labels</option>
+        <option value="REAL">✓ REAL</option>
+        <option value="FAKE">✗ FAKE</option>
+      </select>
+      <button class="btn btn--ghost btn--sm" id="btn-clear-similar-filters">
+        Clear
+      </button>
     </div>
 
+    <div id="similar-list" class="news-list"></div>
+
+    <div class="pagination hidden" id="similar-pagination">
+      <button class="btn btn--ghost btn--sm" id="similar-prev">← Prev</button>
+      <span id="similar-page-info"></span>
+      <button class="btn btn--ghost btn--sm" id="similar-next">Next →</button>
+    </div>
+    
     <div class="empty-state hidden" id="similar-empty">
       <span>🔍</span>
       <p>No similar news items were found in our system.</p>
     </div>
-
+    <div class="empty-state hidden" id="similar-no-results">
+      <span>🔍</span>
+      <p>No similar news matches the selected filter.</p>
+    </div>
     <div class="empty-state hidden" id="similar-no-title">
       <span>⚠️</span>
       <p>Analyze a news article first to find similar ones.</p>
     </div>
-
   </section>
 
   <!-- ── Tab 4: Sources ─────────────────────────────────────────────── -->
@@ -277,7 +307,7 @@
   </section>
 
   </div>
-  
+
   <script src="popup.js"></script>
 </body>
 </html>
